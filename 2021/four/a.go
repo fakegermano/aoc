@@ -47,9 +47,69 @@ func main() {
 		}
 		line += 1
 	}
-	fmt.Println(numbers)
-	fmt.Println(boards)
-	// TODO this is a inneficient way
-	// we should only keep track of which boards have the number
-	// and not the shape of the boards!
+	//fmt.Println(numbers)
+	//fmt.Println(boards)
+
+	winner := -1
+	last_number := -1
+	found := false
+	for _, number := range numbers {
+		if found {
+			break
+		}
+		last_number = number
+		for k := range boards {
+			for i := 0; i < 5; i++ {
+				for j := 0; j < 5; j++ {
+					if boards[k][i][j] == number {
+						boards[k][i][j] = -1
+					}
+				}
+			}
+		}
+
+		for k := range boards {
+			if found {
+				break
+			}
+			for i := 0; i < 5; i++ {
+				sum := 0
+				for j := 0; j < 5; j++ {
+					sum += boards[k][i][j]
+				}
+				if sum == -5 {
+					winner = k
+					found = true
+					break
+				}
+			}
+
+			if found {
+				break
+			}
+			for j := 0; j < 5; j++ {
+				sum := 0
+				for i := 0; i < 5; i++ {
+					sum += boards[k][i][j]
+				}
+				if sum == -5 {
+					winner = k
+					found = true
+					break
+				}
+			}
+		}
+	}
+
+	sum := 0
+	for i := 0; i < 5; i++ {
+		for j := 0; j < 5; j++ {
+			if boards[winner][i][j] != -1 {
+				sum += boards[winner][i][j]
+			}
+		}
+	}
+	//fmt.Println(boards[winner])
+	//fmt.Println(sum, last_number)
+	fmt.Println(sum * last_number)
 }
