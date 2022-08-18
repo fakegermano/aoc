@@ -1,0 +1,245 @@
+#+title: Aoc
+
+* Utilities
+#+name: read-file
+#+begin_src elisp :var filename="test.txt"
+(with-temp-buffer
+  (insert-file-contents filename)
+  (buffer-string))
+#+end_src
+
+* First
+#+name: first-input
+199
+200
+208
+210
+200
+207
+240
+269
+260
+263
+#+name: first-parse
+#+begin_src elisp :var input=first-input
+(cl-map 'list #'string-to-number (split-string input))
+#+end_src
+
+#+RESULTS: first-parse
+| 199 | 200 | 208 | 210 | 200 | 207 | 240 | 269 | 260 | 263 |
+
+** Part A
+#+name: increasing-count
+#+begin_src elisp :var l=first-parse
+(cl-count 't (cl-mapcar '< l (cdr l)))
+#+end_src
+
+#+RESULTS: increasing-count
+: 7
+
+#+call: increasing-count(l=first-parse(input=read-file(filename="input-first.txt")))
+
+#+RESULTS:
+: 1553
+
+** Part B
+#+name: window-sums
+#+begin_src elisp :var l=first-parse
+(cl-mapcar '+ l (cl-mapcar '+ (cdr l) (cdr (cdr l))))
+#+end_src
+
+#+RESULTS: window-sums
+| 607 | 618 | 618 | 617 | 647 | 716 | 769 | 792 |
+
+#+call: increasing-count(l=window-sums)
+
+#+RESULTS:
+: 5
+
+#+call: increasing-count(l=window-sums(l=first-parse(input=read-file(filename="input-first.txt"))))
+
+#+RESULTS:
+: 1597
+
+* Second
+#+name: second-input
+forward 5
+down 5
+forward 8
+up 3
+down 8
+forward 2
+#+name: second-parse
+#+begin_src elisp :var input=second-input
+(cl-map 'list (lambda (e)
+                (list (car e) (string-to-number (cadr e))))
+        (seq-partition (split-string input) 2))
+#+end_src
+
+#+RESULTS: second-parse
+| forward | 5 |
+| down    | 5 |
+| forward | 8 |
+| up      | 3 |
+| down    | 8 |
+| forward | 2 |
+
+** Part A
+#+name: position-depth
+#+begin_src elisp :var input=second-parse
+(apply '* (seq-reduce (lambda (i e)
+              (list (+ (car i) (car e)) (+ (cadr i) (cadr e))))
+            (cl-map 'list (lambda (e)
+                            (pcase (car e)
+                              ("forward" (list (cadr e) 0))
+                              ("down" (list 0 (cadr e)))
+                              ("up" (list 0 (- 0 (cadr e))))))
+                    input)
+            (list 0 0)))
+
+#+end_src
+
+#+RESULTS: position-depth
+: 150
+
+#+call: position-depth(input=second-parse(input=read-file(filename="input-second.txt")))
+
+#+RESULTS:
+: 2322630
+
+** Part B
+#+name: aim-position
+#+begin_src elisp :var input=second-parse
+(apply '* (let* ((aim 0) (position 0) (depth 0))
+            (cl-mapc (lambda (e)
+                       (pcase (car e)
+                         ("forward" (progn
+                                      (setq position (+ position (cadr e)))
+                                      (setq depth (+ depth (* aim (cadr e))))))
+                         ("down" (setq aim (+ aim (cadr e))))
+                         ("up" (setq aim (- aim (cadr e))))))
+                     input)
+            (list position depth)))
+#+end_src
+
+#+RESULTS: aim-position
+: 900
+
+ #+call: aim-position(input=second-parse(input=read-file(filename="input-second.txt")))
+
+ #+RESULTS:
+ : 2105273490
+
+* Third
+#+name: third-input
+00100
+11110
+10110
+10111
+10101
+01111
+00111
+11100
+10000
+11001
+00010
+01010
+#+name: parse-third
+#+begin_src elisp :var input=third-input
+(cl-map 'list (lambda (line)
+                (cl-map 'list #'string-to-number (seq-partition line 1)))
+        (split-string input))
+#+end_src
+
+#+RESULTS: parse-third
+| 0 | 0 | 1 | 0 | 0 |
+| 1 | 1 | 1 | 1 | 0 |
+| 1 | 0 | 1 | 1 | 0 |
+| 1 | 0 | 1 | 1 | 1 |
+| 1 | 0 | 1 | 0 | 1 |
+| 0 | 1 | 1 | 1 | 1 |
+| 0 | 0 | 1 | 1 | 1 |
+| 1 | 1 | 1 | 0 | 0 |
+| 1 | 0 | 0 | 0 | 0 |
+| 1 | 1 | 0 | 0 | 1 |
+| 0 | 0 | 0 | 1 | 0 |
+| 0 | 1 | 0 | 1 | 0 |
+
+
+#+name: list-to-number
+#+begin_src elisp :var bin='(1 0 1 1 0)
+(cl-reduce (lambda (a b) (+ (* a 2) b)) bin)
+#+end_src
+
+#+RESULTS: list-to-number
+: 22
+
+** Part A
+#+name: power-epsilon-gamma
+#+begin_src elisp :var input=parse-third
+(defun to-number (l) (cl-reduce (lambda (a b) (+ (* a 2) b)) l))
+(let ((in (cl-mapcar (lambda (a)
+                       (if (>= (ash a 1) (length input)) 0 1))
+                     (cl-reduce (lambda (a b)
+                                  (cl-mapcar '+ a b))
+                                input))))
+  (let ((epsilon (to-number (cl-map 'list (lambda (e)
+                                            (if (= e 0) 1 0))
+                                    in)))
+        (gamma (to-number in)))
+    (* epsilon gamma)))
+#+end_src
+
+#+RESULTS: power-epsilon-gamma
+: 198
+
+#+call: power-epsilon-gamma(input=parse-third(input=read-file(filename="input-third.txt")))
+
+#+RESULTS:
+: 2595824
+
+** Part B
+#+name: co2-oxygen
+#+begin_src elisp :var input=parse-third
+(defun to-number (l) (cl-reduce (lambda (a b) (+ (* a 2) b)) l))
+(defun count-ones (in pos)
+  (cl-reduce '+ (cl-mapcar (lambda (e)
+                             (nth pos e))
+                           in)))
+
+(defun oxygen-rating (in pos)
+  (if (endp (cdr in))
+      (car in)
+    (oxygen-rating (seq-filter (lambda (el)
+                                 (if (= (nth pos el) (if (>= (ash (count-ones in pos) 1)
+                                                             (length in))
+                                                         1
+                                                       0))
+                                     t))
+                               in)
+                   (+ pos 1))))
+(defun co2-rating (in pos)
+  (if (endp (cdr in))
+      (car in)
+    (co2-rating (seq-filter (lambda (el)
+                              (if (= (nth pos el) (if (>= (ash (count-ones in pos) 1)
+                                                          (length in))
+                                                      0
+                                                    1))
+                                  t))
+                            in)
+                (+ pos 1))))
+(let ((oxygen (to-number (oxygen-rating input 0)))
+      (co2 (to-number (co2-rating input 0))))
+  (* oxygen co2))
+
+
+#+end_src
+
+#+RESULTS:
+: 230
+
+#+call: co2-oxygen(input=parse-third(input=read-file(filename="input-third.txt")))
+
+#+RESULTS:
+: 2135254
