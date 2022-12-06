@@ -2301,6 +2301,7 @@ the calories.
 
  #+RESULTS:
  : 68787
+
 ** Part 2
 For part two, the logic doesn't change much for parsing and conversion, the
 only extra processing we need to do is get the 3 maximum values instead
