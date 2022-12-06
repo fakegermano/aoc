@@ -2464,3 +2464,39 @@ methods we could see great performance gains.
 
 #+RESULTS:
 : 7581
+
+** Part 2
+This version is similar to the first part, as it also requires us to use set
+operations to figure out the item type that is an intersection between all
+three groups, and then the priority value comes in just as before.
+Here we use the ~cadr caddr~ functions which are created as macros that evaluate
+to ~(car (cdr l))~ and ~(car (cdr (cdr l)))~. The ~car~ and ~cdr~ functions
+take the head and tail of the input list, so we can translate ~cadr~ into
+/the head of the tail of the list/ and ~caddr~ into /the head of the tail of/
+/the list obtained after taking the tail of the list/ which in turn translate
+to taking the first element with ~car~, the second with ~cadr~ and the third
+with ~caddr~.
+
+#+name: group-priority-sum
+#+begin_src emacs-lisp :var input=example-input-3
+(apply '+ (mapcar '(lambda (g) (let ((p (car (cl-intersection
+                                              (string-to-list (caddr g))
+                                              (cl-intersection (string-to-list (car g))
+                                                               (string-to-list (cadr g)))))))
+                                 (if (> p 96)
+                                     (- p 96)
+                                   (- p 38))))
+                  (seq-partition (split-string input) 3)))
+#+end_src
+
+#+RESULTS: group-priority-sum
+: 70
+
+The complexity now is the same as before ~O(n)~ as the intersection function
+is applied twice over 3 limited length lists, and the ~partition~ can be done
+in linear time.
+
+#+call: group-priority-sum(input-3)
+
+#+RESULTS:
+: 2525
