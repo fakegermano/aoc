@@ -3,7 +3,6 @@
 * Advent of Code 2022!!
 
 * Day 1:
-** Part 1
 #+name: example-input
 #+begin_example
 1000
@@ -2269,6 +2268,7 @@
 2139
 #+end_example
 
+** Part 1
 *** elisp
 #+name: max-total-calories
 #+begin_src emacs-lisp :var input=example-input
@@ -2288,3 +2288,22 @@
 
  #+RESULTS:
  : 68787
+** Part 2
+*** elisp
+#+name: top3-max-total-calories
+#+begin_src emacs-lisp :var input=example-input
+(apply '+ (subseq (sort (mapcar (lambda (i)
+                (apply '+ i))
+              (mapcar '(lambda (l)
+                         (mapcar 'string-to-number (s-split ":" l)))
+                      (s-split "::" (s-replace "\n" ":" input))))
+              '>)0 3))
+#+end_src
+
+#+RESULTS:
+: 45000
+
+#+call: top3-max-total-calories(input-1)
+
+#+RESULTS:
+: 198041
