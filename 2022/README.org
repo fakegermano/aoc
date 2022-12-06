@@ -2270,6 +2270,13 @@
 
 ** Part 1
 *** elisp
+For this we can first treat the input. It gets a little tricky because the
+input uses an empty line to split things, and ~elisp~ (or at least what I
+know about it) does not work well with that, so we replace it with ~:~, then
+if you use ~::~ it will split the /elfs/ and then use ~:~ to split their
+calories numbers into a list, converting them to numbers. Then we just add
+all of them and extract the maximum.
+
 #+name: max-total-calories
 #+begin_src emacs-lisp :var input=example-input-1
 (seq-max (mapcar (lambda (i)
@@ -2283,6 +2290,11 @@
 #+RESULTS:
 : 24000
 
+Overall the complexity of this algorithm should be ~O(n)~ as we just scan
+the input list a fixed amount of times, given that the calories values are
+"small", otherwise the /string-to-number/ conversion can also add one level
+of complexity, changing it to ~O(kn)~ where ~k~ is the number of digits in
+the calories.
 
  #+call: max-total-calories(input-1)
 
@@ -2290,6 +2302,11 @@
  : 68787
 ** Part 2
 *** elisp
+For part two, the logic doesn't change much for parsing and conversion, the
+only extra processing we need to do is get the 3 maximum values instead
+of just one, we can do that lazily just by sorting the list in descending
+order and getting the first 3 values and adding them.
+
 #+name: top3-max-total-calories
 #+begin_src emacs-lisp :var input=example-input-1
 (apply '+ (subseq (sort (mapcar '(lambda (i) (apply '+ i))
@@ -2303,6 +2320,11 @@
 
 #+RESULTS: top3-max-total-calories
 : 45000
+
+Overall the complexity here becomes ~O(nlog(n))~ as it performs a merge-sort.
+We could reduce the complexity to ~O(n)~ by using something like finding the
+maximum, removing it from the list and repeating that 2 other times with
+the resulting list.
 
 #+call: top3-max-total-calories(input-1)
 
@@ -2326,6 +2348,11 @@ C Z
 
 ** Part 1
 *** elisp
+For this, the solution is easier, as we just need to map all the possible
+point combinations (only 9 of them) and then use /pattern-matching/ over the
+input rounds, adding them all up.
+
+#+name: strategy-score
 #+begin_src emacs-lisp :var input=example-input-2
 (apply '+ (mapcar '(lambda (r) (pcase r
                                  ('("A" "X") (+ 1 3))
@@ -2340,5 +2367,45 @@ C Z
                   (seq-partition (split-string input) 2)))
 #+end_src
 
-#+RESULTS:
+#+RESULTS: strategy-score
 : 15
+
+Overall complexity of the algorithm is ~O(n)~ as we only scan through the
+input to get the points for each round, then reduce the list in one go into
+its sum.
+
+ #+call: strategy-score(input-2)
+
+ #+RESULTS:
+ : 12156
+
+** Part 2
+*** elisp
+For this, we just need to change the pattern matching values to reflect the
+changes, taking a little effort to figure out beforehand what is the points
+for each scenario.
+
+#+name: real-strategy-score
+#+begin_src emacs-lisp :var input=example-input-2
+(apply '+ (mapcar '(lambda (r) (pcase r
+                                 ('("A" "X") (+ 0 3))
+                                 ('("A" "Y") (+ 3 1))
+                                 ('("A" "Z") (+ 6 2))
+                                 ('("B" "X") (+ 0 1))
+                                 ('("B" "Y") (+ 3 2))
+                                 ('("B" "Z") (+ 6 3))
+                                 ('("C" "X") (+ 0 2))
+                                 ('("C" "Y") (+ 3 3))
+                                 ('("C" "Z") (+ 6 1))))
+                  (seq-partition (split-string input) 2)))
+#+end_src
+
+#+RESULTS: real-strategy-score
+: 12
+
+The complexity does not change from the first part.
+
+#+call: real-strategy-score(input-2)
+
+#+RESULTS:
+: 10835
