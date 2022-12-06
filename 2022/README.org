@@ -2,7 +2,8 @@
 
 * Advent of Code 2022!!
 
-* Day 1:
+* Day 1
+Example input:
 #+name: example-input-1
 #+begin_example
 1000
@@ -21,6 +22,7 @@
 10000
 #+end_example
 
+Loading the puzzle input from a file:
 #+name: input-1
 #+begin_src emacs-lisp
 (with-temp-buffer
@@ -2269,7 +2271,7 @@
 #+end_example
 
 ** Part 1
-*** elisp
+*** ~elisp~
 For this we can first treat the input. It gets a little tricky because the
 input uses an empty line to split things, and ~elisp~ (or at least what I
 know about it) does not work well with that, so we replace it with ~:~, then
@@ -2301,7 +2303,7 @@ the calories.
  #+RESULTS:
  : 68787
 ** Part 2
-*** elisp
+*** ~elisp~
 For part two, the logic doesn't change much for parsing and conversion, the
 only extra processing we need to do is get the 3 maximum values instead
 of just one, we can do that lazily just by sorting the list in descending
@@ -2332,6 +2334,7 @@ the resulting list.
 : 198041
 
 * Day 2
+Example input:
 #+name: example-input-2
 #+begin_example
 A Y
@@ -2339,6 +2342,7 @@ B X
 C Z
 #+end_example
 
+Loading the puzzle input from a file:
 #+name: input-2
 #+begin_src emacs-lisp
 (with-temp-buffer
@@ -2347,7 +2351,7 @@ C Z
 #+end_src
 
 ** Part 1
-*** elisp
+*** ~elisp~
 For this, the solution is easier, as we just need to map all the possible
 point combinations (only 9 of them) and then use /pattern-matching/ over the
 input rounds, adding them all up.
@@ -2380,7 +2384,7 @@ its sum.
  : 12156
 
 ** Part 2
-*** elisp
+*** ~elisp~
 For this, we just need to change the pattern matching values to reflect the
 changes, taking a little effort to figure out beforehand what is the points
 for each scenario.
