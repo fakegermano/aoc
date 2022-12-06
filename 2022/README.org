@@ -24,7 +24,7 @@
 #+name: input-1
 #+begin_src emacs-lisp
 (with-temp-buffer
-  (insert-file-contents "input1A.txt")
+  (insert-file-contents "input1.txt")
   (format "%s" (buffer-string)))
 #+end_src
 
