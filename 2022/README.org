@@ -6610,3 +6610,109 @@ Its complexity also stays the same as no logic changes happened: ~O(n)~.
 
 #+RESULTS:
 : 2334
+
+* Day 7
+Example input:
+
+#+name: example-input-7
+#+begin_example
+$ cd /
+$ ls
+dir a
+14848514 b.txt
+8504156 c.dat
+dir d
+$ cd a
+$ ls
+dir e
+29116 f
+2557 g
+62596 h.lst
+$ cd e
+$ ls
+584 i
+$ cd ..
+$ cd ..
+$ cd d
+$ ls
+4060174 j
+8033020 d.log
+5626152 d.ext
+7214296 k
+#+end_example
+
+#+name: input-7
+#+call: input-loader("input7.txt")
+
+** Part 1
+
+This is a more complex problem, and requires us to use a hashmap. To use strings
+as keys, we must set the test function for the hashmap to use content/value
+and not the object reference.
+We iterate over the input. We separate by the ~$~ marker, bundling everything
+until the next marker, this makes knowing the result of a command easier.
+We then iterate over the list of command-output pairs, and use pattern-matching
+to know if its a ~cd~ or an ~ls~. For ~cd~ we keep track of the directory path
+from the root, and for ~ls~ we add to the hashmap with the current path as key
+and the path for inner directories and size for inner files as value.
+
+We then iterate over this hashmap, defining a recursive function to find the
+size of a directory from its path. It is crucial to use the full path as the
+identifier of the directory as there can be folders with the same name inside
+different folders, /e.g./ ~/a/b/c/d~ and ~/a/e/d~ where ~d~ is the repeated
+name, and its size must be different for each time it appears on the directory
+tree.
+
+After this, we filter out the entries that are bigger than 100000 and sum the
+overall value to get the result.
+
+#+name: dir-tree-deletable-count
+#+begin_src emacs-lisp :var input=example-input-7
+(let ((dir (make-hash-table :test 'equal)) (cDir '()))
+  (-each (let ((tmp 0))
+           (-partition-by '(lambda (i) (if (string= (car i) "$")
+                                           (set 'tmp (random))
+                                         tmp))
+                          (mapcar (-partial #'s-split " ")
+                                  (delete "" (s-split "\n" input)))))
+    '(lambda (c) (pcase (car c)
+                   (`("$" "cd" ,p)
+                    (if (string= p "..")
+                        (set 'cDir (cdr cDir))
+                      (set 'cDir (cons p cDir))))
+                   (`("$" "ls")
+                    (puthash (mapconcat #'identity (reverse cDir) "/")
+                             (mapcar '(lambda (n)
+                                        (pcase n
+                                          (`("dir" ,d)
+                                           (mapconcat #'identity (reverse (cons d cDir)) "/"))
+                                          (`(,s ,_)
+                                           (string-to-number s))))
+                                     (cdr c))
+                             dir)
+                    ))))
+  (defun size (n)
+    ""
+    (pcase n
+      ((pred numberp) n)
+      ((pred stringp) (size (gethash n dir)))
+      ((pred listp) (apply '+ (mapcar #'size n)))))
+  (let (alist)
+    (maphash '(lambda (key val) (push (cons key (size val)) alist)) dir)
+    (apply #'+ (-filter (-partial #'>= 100000) (mapcar 'cdr alist)))))
+#+end_src
+
+#+RESULTS: dir-tree-deletable-count
+: 95437
+
+The complexity for this algorithm depends on the amount of folders overall,
+as in the worst case we have all of them nested, the recursion then runs ~O(n)~
+times to calculate the size. Because when we are parsing the input we need to
+build the path from the root for each folder, we end up doing ~O(n^2)~ overall
+operations. This can be improved with caching and in the real world is closer
+to ~O(n)~ as you don't have that deep of nesting.
+
+#+call: dir-tree-deletable-count(input-7)
+
+#+RESULTS:
+: 1391690
