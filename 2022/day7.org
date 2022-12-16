@@ -1,0 +1,176 @@
+#+title: Day7
+
+* Setup
+#+name: input-loader
+#+begin_src emacs-lisp :var filename=input.txt
+(with-temp-buffer
+  (insert-file-contents filename)
+  (format "%s" (buffer-string)))
+#+end_src
+
+* Day 7
+Example input:
+
+#+name: example-input-7
+#+begin_example
+$ cd /
+$ ls
+dir a
+14848514 b.txt
+8504156 c.dat
+dir d
+$ cd a
+$ ls
+dir e
+29116 f
+2557 g
+62596 h.lst
+$ cd e
+$ ls
+584 i
+$ cd ..
+$ cd ..
+$ cd d
+$ ls
+4060174 j
+8033020 d.log
+5626152 d.ext
+7214296 k
+#+end_example
+
+#+name: input-7
+#+call: input-loader("input7.txt") :results none
+
+** Part 1
+
+This is a more complex problem, and requires us to use a hashmap. To use strings
+as keys, we must set the test function for the hashmap to use content/value
+and not the object reference.
+We iterate over the input. We separate by the ~$~ marker, bundling everything
+until the next marker, this makes knowing the result of a command easier.
+We then iterate over the list of command-output pairs, and use pattern-matching
+to know if its a ~cd~ or an ~ls~. For ~cd~ we keep track of the directory path
+from the root, and for ~ls~ we add to the hashmap with the current path as key
+and the path for inner directories and size for inner files as value.
+
+We then iterate over this hashmap, defining a recursive function to find the
+size of a directory from its path. It is crucial to use the full path as the
+identifier of the directory as there can be folders with the same name inside
+different folders, /e.g./ ~/a/b/c/d~ and ~/a/e/d~ where ~d~ is the repeated
+name, and its size must be different for each time it appears on the directory
+tree.
+
+After this, we filter out the entries that are bigger than 100000 and sum the
+overall value to get the result.
+
+#+name: dir-tree-deletable-count
+#+begin_src emacs-lisp :var input=example-input-7
+(let ((dir (make-hash-table :test 'equal)) (cDir '()))
+  (-each (let ((tmp 0))
+           (-partition-by '(lambda (i) (if (string= (car i) "$")
+                                           (set 'tmp (random))
+                                         tmp))
+                          (mapcar (-partial #'s-split " ")
+                                  (delete "" (s-split "\n" input)))))
+    '(lambda (c) (pcase (car c)
+                   (`("$" "cd" ,p)
+                    (if (string= p "..")
+                        (set 'cDir (cdr cDir))
+                      (set 'cDir (cons p cDir))))
+                   (`("$" "ls")
+                    (puthash (mapconcat #'identity (reverse cDir) "/")
+                             (mapcar '(lambda (n)
+                                        (pcase n
+                                          (`("dir" ,d)
+                                           (mapconcat #'identity (reverse (cons d cDir)) "/"))
+                                          (`(,s ,_)
+                                           (string-to-number s))))
+                                     (cdr c))
+                             dir)
+                    ))))
+  (defun size (n)
+    ""
+    (pcase n
+      ((pred numberp) n)
+      ((pred stringp) (size (gethash n dir)))
+      ((pred listp) (apply '+ (mapcar #'size n)))))
+  (let (alist)
+    (maphash '(lambda (key val) (push (cons key (size val)) alist)) dir)
+    (apply #'+ (-filter (-partial #'>= 100000) (mapcar 'cdr alist)))))
+#+end_src
+
+#+RESULTS: dir-tree-deletable-count
+: 95437
+
+The complexity for this algorithm depends on the amount of folders overall ~n~
+and the maximum depth of the tree ~k~.
+Even though we have a recursion, we cannot have structures that are visited
+twice on the recursion path as it wouldn't make sense. The complexity then
+depends on visiting each folder with ~O(n)~. But, as the number of folders
+also comes from the number of inputs, our complexity is actually ~O(k*n)~
+because we build the folder path for each time we see the folder on the input
+list. This could be better with some caching.
+
+#+call: dir-tree-deletable-count(input-7) :cache yes
+
+#+RESULTS[b87df86310a4f7662d36f87651196d86297639bd]:
+: 1391690
+
+** Part 2
+
+For the second part we just need to change the later logic. We also take the
+chance to add a hash table for caching the sizes, and get the minimum directory
+size that, when added to the unused space, is above the threshold set.
+
+#+name: dir-tree-to-delete-size
+#+begin_src emacs-lisp :var input=example-input-7
+(let ((dir (make-hash-table :test 'equal)) (cDir '()))
+  (-each (let ((tmp 0))
+           (-partition-by '(lambda (i) (if (string= (car i) "$")
+                                           (set 'tmp (random))
+                                         tmp))
+                          (mapcar (-partial #'s-split " ")
+                                  (delete "" (s-split "\n" input)))))
+    '(lambda (c) (pcase (car c)
+                   (`("$" "cd" ,p)
+                    (if (string= p "..")
+                        (set 'cDir (cdr cDir))
+                      (set 'cDir (cons p cDir))))
+                   (`("$" "ls")
+                    (puthash (mapconcat #'identity (reverse cDir) "/")
+                             (mapcar '(lambda (n)
+                                        (pcase n
+                                          (`("dir" ,d)
+                                           (mapconcat #'identity (reverse (cons d cDir)) "/"))
+                                          (`(,s ,_)
+                                           (string-to-number s))))
+                                     (cdr c))
+                             dir)
+                    ))))
+  (let ((dirSizes (make-hash-table :test 'equal)) (alist))
+    (defun size (n)
+      ""
+      (pcase n
+        ((pred numberp) n)
+        ((pred stringp) (if (gethash n dirSizes)
+                            (gethash n dirSizes)
+                          (size (gethash n dir))))
+        ((pred listp) (apply '+ (mapcar #'size n)))))
+
+    (maphash '(lambda (key val)
+                (puthash key (size val) dirSizes)
+                (push (cons key (gethash key dirSizes)) alist))
+             dir)
+    (let ((unusedSpace (- 70000000 (gethash "/" dirSizes))))
+      (- (seq-min (-filter (-partial #'<= 30000000) (mapcar '(lambda (s) (+ unusedSpace s)) (mapcar 'cdr alist)))) unusedSpace))))
+#+end_src
+
+#+RESULTS: dir-tree-to-delete-size
+: 24933642
+
+The complexity stays the same! ~O(k*n)~.
+
+#+call: dir-tree-to-delete-size(input-7) :cache yes
+
+#+RESULTS[7266e0570bcc0fea9496e10cb38d50ba7141add3]:
+: 5469168

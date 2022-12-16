@@ -1,0 +1,95 @@
+#+title: Day3
+
+* Setup
+#+name: input-loader
+#+begin_src emacs-lisp :var filename=input.txt
+(with-temp-buffer
+  (insert-file-contents filename)
+  (format "%s" (buffer-string)))
+#+end_src
+
+* Day 3
+Example input:
+#+name: example-input-3
+#+begin_example
+vJrwpWtwJgWrhcsFMMfFFhFp
+jqHRNqRjqzjGDLGLrsFMfFZSrLrFZsSL
+PmmdzqPrVvPwwTWBwg
+wMqvLMZHhHMvwLHjbvcjnnSBnvTQFn
+ttgJtRGJQctTZtZT
+CrZsJsPPZsGzwwsLwLmpwMDw
+#+end_example
+
+
+Loading the puzzle input from a file:
+#+name: input-3
+#+call: input-loader("input3.txt") :results none
+
+** Part 1
+To solve this, we just need to, after parsing the inputs, split the rucksacks
+in half, apply an intersection between them and using the result, convert the
+character into a priority value using the ~ASCI~ value for the character.
+After that, we can reduce the list of priorities into a sum.
+
+#+name: priority-sum
+#+begin_src emacs-lisp :var input=example-input-3
+(apply '+ (mapcar '(lambda (r) (let* ((len (seq-length r)) (m (/ len 2)))
+                                 (let ((p (car (cl-intersection (string-to-list (subseq r 0 m))
+                                                                (string-to-list (subseq r m len))))))
+                                   (if (> p 96)
+                                       (- p 96)
+                                     (- p 38)))))
+                  (split-string input)))
+#+end_src
+
+#+RESULTS: priority-sum
+: 157
+
+The overall complexity of this algorithm should be ~O(n)~, as the length of
+the input string for each rucksack is limited to at most ~26+27=53~ elements
+as we are told the elf only failed for exactly one item. this leaves the
+complexity of the ~intersection~ function (which depends on several calls to
+~membership~ checks). This makes the constants for the complexity a lot higher
+so when run with other intersection algorithms that use hashing or similar
+methods we could see great performance gains.
+
+#+call: priority-sum(input-3) :cache yes
+
+#+RESULTS[a46d1b129807a4ccab2fc85edbb2d4ef0013c4bb]:
+: 7581
+
+** Part 2
+This version is similar to the first part, as it also requires us to use set
+operations to figure out the item type that is an intersection between all
+three groups, and then the priority value comes in just as before.
+Here we use the ~cadr caddr~ functions which are created as macros that evaluate
+to ~(car (cdr l))~ and ~(car (cdr (cdr l)))~. The ~car~ and ~cdr~ functions
+take the head and tail of the input list, so we can translate ~cadr~ into
+/the head of the tail of the list/ and ~caddr~ into /the head of the tail of/
+/the list obtained after taking the tail of the list/ which in turn translate
+to taking the first element with ~car~, the second with ~cadr~ and the third
+with ~caddr~.
+
+#+name: group-priority-sum
+#+begin_src emacs-lisp :var input=example-input-3
+(apply '+ (mapcar '(lambda (g) (let ((p (car (cl-intersection
+                                              (string-to-list (caddr g))
+                                              (cl-intersection (string-to-list (car g))
+                                                               (string-to-list (cadr g)))))))
+                                 (if (> p 96)
+                                     (- p 96)
+                                   (- p 38))))
+                  (seq-partition (split-string input) 3)))
+#+end_src
+
+#+RESULTS: group-priority-sum
+: 70
+
+The complexity now is the same as before ~O(n)~ as the intersection function
+is applied twice over 3 limited length lists, and the ~partition~ can be done
+in linear time.
+
+#+call: group-priority-sum(input-3) :cache yes
+
+#+RESULTS[617dd921b704023e08b94a4bc850eff89496f771]:
+: 2525

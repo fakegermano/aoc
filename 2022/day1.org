@@ -1,0 +1,95 @@
+#+title: Day1
+
+* Setup
+#+name: input-loader
+#+begin_src emacs-lisp :var filename=input.txt
+(with-temp-buffer
+  (insert-file-contents filename)
+  (format "%s" (buffer-string)))
+#+end_src
+
+* Day 1
+Example input:
+#+name: example-input-1
+#+begin_example
+1000
+2000
+3000
+
+4000
+
+5000
+6000
+
+7000
+8000
+9000
+
+10000
+#+end_example
+
+Loading the puzzle input from a file:
+#+name: input-1
+#+call: input-loader("input1.txt") :results none
+
+** Part 1
+For this we can first treat the input. It gets a little tricky because the
+input uses an empty line to split things, and ~elisp~ (or at least what I
+know about it) does not work well with that, so we replace it with ~:~, then
+if you use ~::~ it will split the /elfs/ and then use ~:~ to split their
+calories numbers into a list, converting them to numbers. Then we just add
+all of them and extract the maximum.
+
+#+name: max-total-calories
+#+begin_src emacs-lisp :var input=example-input-1
+(seq-max (mapcar (lambda (i)
+                   (apply '+ i))
+                 (mapcar '(lambda (l)
+                            (mapcar 'string-to-number (s-split ":" l)))
+                         (s-split "::" (s-replace "\n" ":" input)))))
+
+#+end_src
+
+#+RESULTS: max-total-calories
+: 24000
+
+Overall the complexity of this algorithm should be ~O(n)~ as we just scan
+the input list a fixed amount of times, given that the calories values are
+"small", otherwise the /string-to-number/ conversion can also add one level
+of complexity, changing it to ~O(kn)~ where ~k~ is the number of digits in
+the calories.
+
+ #+call: max-total-calories(input-1) :cache yes
+
+ #+RESULTS[7fca979ee7fe9b6055f4ae256d60bee09bd324e3]:
+ : 68787
+
+** Part 2
+For part two, the logic doesn't change much for parsing and conversion, the
+only extra processing we need to do is get the 3 maximum values instead
+of just one, we can do that lazily just by sorting the list in descending
+order and getting the first 3 values and adding them.
+
+#+name: top3-max-total-calories
+#+begin_src emacs-lisp :var input=example-input-1
+(apply '+ (subseq (sort (mapcar '(lambda (i) (apply '+ i))
+                                (mapcar '(lambda (l)
+                                           (mapcar 'string-to-number
+                                                   (s-split ":" l)))
+                                        (s-split "::" (s-replace "\n" ":" input))))
+                        '>)
+                  0 3))
+#+end_src
+
+#+RESULTS: top3-max-total-calories
+: 45000
+
+Overall the complexity here becomes ~O(nlog(n))~ as it performs a merge-sort.
+We could reduce the complexity to ~O(n)~ by using something like finding the
+maximum, removing it from the list and repeating that 2 other times with
+the resulting list.
+
+#+call: top3-max-total-calories(input-1) :cache yes
+
+#+RESULTS[e55ab80d999e65d1d85e61035d3c70759a2e2e37]:
+: 198041

@@ -1,0 +1,133 @@
+#+title: Day5
+
+* Setup
+#+name: input-loader
+#+begin_src emacs-lisp :var filename=input.txt
+(with-temp-buffer
+  (insert-file-contents filename)
+  (format "%s" (buffer-string)))
+#+end_src
+
+* Day 5
+
+Example input (I cheated and changed the input shape to make it easier). The
+input has each stack in top-down order on each line.
+
+#+name: example-input-5
+#+begin_example
+N Z
+D C M
+P
+
+move 1 from 2 to 1
+move 3 from 1 to 3
+move 2 from 2 to 1
+move 1 from 1 to 2
+#+end_example
+
+Loading the puzzle input from a file, it was also modified.
+
+#+name: input-5
+#+call: input-loader("input5.txt") :results none
+
+** Part 1
+For the solution, we need to separate the input between the stacks and the
+instruction list. We use a ~plist~ from ~elisp~ to make object access and
+override values easier using key/value pairs.
+
+We also treat the instruction removing fluff like the words /move/, /from/ and
+/to/. Then we are left with two things, the list of instructions and the ~plist~
+with the stacks ordered by number. We iterate over the instruction list,
+repeating the moving (pop from one stack and push to another) and overriding
+the stack list with the updated stacks after executing the instruction.
+
+At the end we reduce the stacks to print just the head of each in a string.
+
+#+name: crates-on-top
+#+begin_src emacs-lisp :var input=example-input-5
+(let* ((input (mapcar '(lambda (r) (delete "" (s-split ":" r)))
+                      (s-split "::" (s-replace "\n" ":" input))))
+       (stacks (-interleave (-iota (length (car input))) (mapcar '(lambda (s) (split-string s)) (car input))))
+       (instructions (mapcar '(lambda (i)
+                                (mapcar #'string-to-number
+                                        (s-split ":"
+                                                 (s-trim (s-replace-regexp
+                                                          (rx (or " from " " to "))
+                                                          ":"
+                                                          (s-replace "move" "" i))))))
+                                (cadr input))))
+  (mapcar '(lambda (i) (let* ((o (- (cadr i) 1)) (d (- (caddr i) 1))
+                              (oStack (plist-get stacks o)) (dStack (plist-get stacks d)))
+                         (dotimes (n (car i))
+                           (if (car oStack)
+                               (progn (setq dStack (cons (car oStack) dStack))
+                                      (setq oStack (cdr oStack)))))
+                         (setq stacks (plist-put (plist-put stacks o oStack) d dStack))))
+          instructions)
+  (--reduce (format "%s%s" acc it) (mapcar '(lambda (i) (car (plist-get stacks i)))
+                                           (-iota (length (car input))))))
+#+end_src
+
+#+RESULTS: crates-on-top
+: CMZ
+
+The complexity of the algorithm above depends on 3 factors, the size of the
+stack list ~k~, the total number of elements on all stacks ~l~ and the size of
+the instruction list ~n~. As we can see, the initial parsing works in ~O(l+n)~
+as we just iterate over the stack elements and the instruction list.
+
+Now for the simulation algorithm, it iterates over all instructions, and for
+each iteration it runs 2 ~plist-get~ instructions and 2 ~plist-put~ instructions.
+As those run over a list elementwise, they have complexity ~O(k)~ for ~plist-get~
+and ~O(2k)~ for ~plist-put~. Each iteration also loops for a number of elements
+that in the worst case could be the all the stackable elements (that is, ~l~).
+So the overall complexity of each iteration is ~O(k+l)~ as constants don't
+matter much for this analysis. The overall complexity of the simulation is then
+~O(n*(k+l))~, as the last reduction step is less than the iteration and can be
+simplified.
+
+ #+call: crates-on-top(input-5) :cache yes
+
+ #+RESULTS[178339c714011c12bbeba85ea0a0f755fc199c00]:
+ : FRDSQRRCD
+
+** Part 2
+
+For the second part, we can simplify the algorithm, as we don't need to loop
+inside the instruction part, and we just need to /take/ an amount of elements
+from one stack and just append to another.
+
+#+name: crates-on-top-9001
+#+begin_src emacs-lisp :var input=example-input-5
+(let* ((input (mapcar '(lambda (r) (delete "" (s-split ":" r)))
+                      (s-split "::" (s-replace "\n" ":" input))))
+       (stacks (-interleave (-iota (length (car input))) (mapcar '(lambda (s) (split-string s)) (car input))))
+       (instructions (mapcar '(lambda (i)
+                                (mapcar #'string-to-number
+                                        (s-split ":"
+                                                 (s-trim (s-replace-regexp
+                                                          (rx (or " from " " to "))
+                                                          ":"
+                                                          (s-replace "move" "" i))))))
+                                (cadr input))))
+  (mapcar '(lambda (i) (let* ((o (- (cadr i) 1)) (d (- (caddr i) 1))
+                              (oStack (plist-get stacks o)) (dStack (plist-get stacks d)))
+                         (setq dStack (-concat (-take (car i) oStack) dStack))
+                         (setq oStack (-drop (car i) oStack))
+                         (setq stacks (plist-put (plist-put stacks o oStack) d dStack))))
+          instructions)
+  (--reduce (format "%s%s" acc it) (mapcar '(lambda (i) (car (plist-get stacks i)))
+                                           (-iota (length (car input))))))
+#+end_src
+
+#+RESULTS: crates-on-top-9001
+: MCD
+
+The complexity doesn't change much, as the ~-take/-drop/-concat~ functions run
+over the list of elements with complexity ~O(l)~, with the ~plist-put/plist-get~
+functions, the complexity is the same: ~O(n*(k+l))~
+
+#+call: crates-on-top-9001(input-5) :cache yes
+
+#+RESULTS[4aee445fded34a21012263628f3b210b699858f9]:
+: HRFTQVWNN

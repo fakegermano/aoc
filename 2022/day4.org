@@ -1,0 +1,115 @@
+#+title: Day4
+
+* Setup
+#+name: input-loader
+#+begin_src emacs-lisp :var filename=input.txt
+(with-temp-buffer
+  (insert-file-contents filename)
+  (format "%s" (buffer-string)))
+#+end_src
+
+* Day 4
+Example input:
+#+name: example-input-4
+#+begin_example
+2-4,6-8
+2-3,4-5
+5-7,7-9
+2-8,3-7
+6-6,4-6
+2-6,4-8
+#+end_example
+
+
+Loading the puzzle input from a file:
+#+name: input-4
+#+call: input-loader("input4.txt") :results none
+
+** Part 1
+For this puzzle, other than parsing the input, we need to realize what does it
+mean to have a fully contained interval, that is, the starting number and
+ending number of the smaller interval must be less then or equal to the
+starting number and ending number of the bigger interval. We can check this
+by first finding the earliest starting interval, this must be the /bigger/
+interval for us to have a full coverage, so we check that the other interval's
+start and end is contained within the earliest starting interval.
+
+#+name: fully-contained-amount
+#+begin_src emacs-lisp :var input=example-input-4
+(defun split-dash-number (in)
+    "split string by dash and convert to number"
+    (mapcar #'string-to-number (s-split "-" in)))
+(apply #'+ (mapcar '(lambda (g) (let* ((r (mapcar #'split-dash-number g))
+                                       (s1 (caar r))
+                                       (e1 (cadar r))
+                                       (s2 (caadr r))
+                                       (e2 (cadadr r)))
+                                  (if (or (and (<= s1 s2)
+                                               (<= e2 e1))
+                                          (and (<= s2 s1)
+                                               (<= e1 e2)))
+                                      1
+                                    0)))
+                   (mapcar '(lambda (l) (s-split "," l))
+                           (split-string input))))
+
+#+end_src
+
+#+RESULTS: fully-contained-amount
+: 2
+
+The overall complexity of this algorithm is ~O(n)~ as we only scan through
+the list of inputs once, doing ~O(1)~ comparisons.
+
+#+call: fully-contained-amount(input-4) :cache yes
+
+#+RESULTS[bc2b43542b3a73d438d6232a5a6472cc51aff89c]:
+: 588
+
+** Part 2
+The second part covers a broader problem, where we are not trying to find only
+the full coverage, but only the intervals where there is any overlap. We do
+this by checking that either end of both intervals are contained on the limits
+of the other interval, /e.g./: for intervals 2-4 and 3-6 we check:
+
+1. ~3 >= 2 >= 6~
+2. ~3 >= 4 >= 6~ ***
+3. ~2 >= 3 >= 4~ ***
+4. ~2 >= 6 >= 4~
+
+Where you can see that both ~2.~ and ~3.~ indicate an overlap.
+
+#+name: overlap-count
+#+begin_src emacs-lisp :var input=example-input-4
+(defun split-dash-number (in)
+    "split string by dash and convert to number"
+    (mapcar #'string-to-number (s-split "-" in)))
+(apply #'+ (mapcar '(lambda (g) (let* ((r (mapcar #'split-dash-number g))
+                                       (s1 (caar r))
+                                       (e1 (cadar r))
+                                       (s2 (caadr r))
+                                       (e2 (cadadr r)))
+                                  (if (or (and (>= s2 s1)
+                                               (<= s2 e1))
+                                          (and (>= e2 s1)
+                                               (<= e2 e1))
+                                          (and (>= s1 s2)
+                                               (<= s1 e2))
+                                          (and (>= e1 s2)
+                                               (<= e1 s2)))
+
+                                      1
+                                    0)))
+                   (mapcar '(lambda (l) (s-split "," l))
+                           (split-string input))))
+#+end_src
+
+#+RESULTS: overlap-count
+: 4
+
+The complexity doesn't change from the previous algorithm and is still ~O(n)~.
+
+#+call: overlap-count(input-4) :cache yes
+
+#+RESULTS[489cbc19a66c309aac30b060c192f4db45c1cf31]:
+: 911

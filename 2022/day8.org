@@ -1,0 +1,140 @@
+#+title: Day8
+
+* Setup
+#+name: input-loader
+#+begin_src emacs-lisp :var filename=input.txt
+(with-temp-buffer
+  (insert-file-contents filename)
+  (format "%s" (buffer-string)))
+#+end_src
+
+* Day 8
+
+#+name: example-input-8
+#+begin_example
+30373
+25512
+65332
+33549
+35390
+#+end_example
+
+#+name: input-8
+#+call: input-loader("input8.txt") :results none
+
+** Part 1
+
+To solve this problem we count the number of visible trees in each direction
+keeping track of what was the highest tree found so far. We repeat this in
+all 4 directions (/right-left/, /left-right/, /up-down/, /down-up/). Then we
+mark each tree that is visible in each direction combining them with a logical
+~or~. We then count the number of trees overall.
+
+#+name: count-visible-trees
+#+begin_src emacs-lisp :var input=example-input-8
+(defun transpose (m)
+  (apply #'cl-mapcar #'list m))
+
+(defun visible-trees-unidir (r)
+  (let ((htree -1))
+    (-map (lambda (tree) (if (> tree htree)
+                             (progn
+                               (set 'htree tree)
+                               t)
+                           nil))
+          r)))
+(defun not-null (e)
+  (funcall (-compose #'not #'null) e))
+
+(defun visible-trees-bidir (r)
+  (-map (lambda (e) (-some #'not-null e))
+        (-zip-lists
+         (visible-trees-unidir r)
+         (reverse (visible-trees-unidir (reverse r))))))
+
+(let ((treemap (-map (lambda (r) (-map (-compose
+                                        #'string-to-number
+                                        (-partial #'format "%c"))
+                                       (string-to-list r)))
+                     (split-string input))))
+  (-count #'identity
+          (-flatten (-map (lambda (r) (-map (lambda (el) (-some #'not-null el))
+                                            (-zip-lists (car r) (cadr r))))
+                          (-zip-lists (-map #'visible-trees-bidir
+                                            treemap)
+                                      (transpose (-map #'visible-trees-bidir
+                                                       (transpose treemap))))))))
+
+#+end_src
+
+#+RESULTS: count-visible-trees
+: 21
+
+The complexity of this algorithm is dependant on the size of the map, that is,
+the number of rows(~r~) and columns(~c~). Overall, we just go through each
+element of the map, a constant amount of times, which means the complexity
+is ~O(r*c)~. We can simplify this to ~O(n^2)~  if we assume the map has square
+coordinates.
+
+#+call: count-visible-trees(input-8) :cache yes
+
+#+RESULTS[ffc330d2bad9cf9e03acc11d89418c07bd9304f9]:
+: 1776
+
+** Part 2
+
+For the second part, we switch strategies, and go over each element of the treemap
+and for each direction go over counting the ones that are smaller until we
+find one with the same size (and count it).
+
+#+name: scenic-score
+#+begin_src emacs-lisp :var input=example-input-8
+(defun tree-height (m c)
+  (nth (cadr c) (nth (car c) m)))
+
+(defun take-until (pred list)
+  (let (reached oldReached)
+    (-take-while (lambda (e) (progn
+                               (set 'oldReached reached)
+                               (set 'reached (funcall pred e))
+                               (null oldReached)))
+                   list)))
+(let* ((treemap (-map (lambda (r) (-map (-compose
+                                         #'string-to-number
+                                         (-partial #'format "%c"))
+                                        (string-to-list r)))
+                      (split-string input)))
+       (rlen (length treemap))
+       (clen (length (car treemap)))
+       (scores))
+  (-each-indexed treemap
+    (lambda (i r)
+      (-each-indexed r
+        (lambda (j e)
+          (progn
+            (add-to-list 'scores (-product (list (length (take-until (-compose (-partial (-flip #'>=) e)
+                                                                               (-partial #'tree-height treemap)) ;; up
+                                                                     (reverse (-zip-lists (-iota i) (-cycle (list j))))))
+                                                 (length (take-until (-compose (-partial (-flip #'>=) e)
+                                                                               (-partial #'tree-height treemap)) ;; down
+                                                                     (-zip-lists (-iota (1- (- rlen i)) (1+ i) 1) (-cycle (list j)))))
+                                                 (length (take-until (-compose (-partial (-flip #'>=) e)
+                                                                               (-partial #'tree-height treemap)) ;; right
+                                                                     (reverse (-zip-lists (-cycle (list i)) (-iota j)))))
+                                                 (length (take-until (-compose (-partial (-flip #'>=) e)
+                                                                               (-partial #'tree-height treemap)) ;; left
+                                                                     (-zip-lists (-cycle (list i)) (-iota (1- (- clen j)) (1+ j) 1))))))))))))
+  (-max scores))
+#+end_src
+
+#+RESULTS:
+: 8
+
+The complexity increases a lot. As we go over all 4 directions for each element
+we end up doing ~O(r*(r*c))~ or ~O(c*(r*c))~, depending on what is bigger.
+We can simplify that to ~O(n^3)~ if we assume the map has square coordinates.
+
+#+call: scenic-score(input-8) :cache yes
+
+#+RESULTS[23632496e6a87830b34b03bc74acd8e8caad163b]:
+: 234416

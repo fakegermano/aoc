@@ -1,0 +1,64 @@
+#+title: Day9
+
+* Setup
+#+name: input-loader
+#+begin_src emacs-lisp :var filename=input.txt
+(with-temp-buffer
+  (insert-file-contents filename)
+  (format "%s" (buffer-string)))
+#+end_src
+
+* Day 9
+
+#+name: example-input-9
+#+begin_example
+R 4
+U 4
+L 3
+D 1
+R 4
+D 1
+L 5
+R 2
+#+end_example
+
+** Part 1
+#+begin_src emacs-lisp :var input=example-input-9
+(let ((instructions (-map (-partial #'s-split " ")
+                          (delete "" (s-split "\n" input))))
+      (i 0) (j 0) (visited) (previous))
+  (-each instructions
+    (lambda (el) (--dotimes (string-to-number (cadr el))
+                   (progn
+                     (set 'previous (list i j))
+                     (add-to-list 'visited previous)
+                     (pcase (car el)
+                       (`"R" (set 'j (1+ j)))
+                       (`"L" (set 'j (1- j)))
+                       (`"U" (set 'i (1+ i)))
+                       (`"D" (set 'i (1- i))))))))
+  visited)
+#+end_src
+
+#+RESULTS:
+| 2 | 0 |
+| 2 | 1 |
+| 2 | 2 |
+| 2 | 3 |
+| 2 | 5 |
+| 3 | 5 |
+| 3 | 3 |
+| 3 | 2 |
+| 3 | 1 |
+| 4 | 1 |
+| 4 | 2 |
+| 4 | 3 |
+| 4 | 4 |
+| 3 | 4 |
+| 2 | 4 |
+| 1 | 4 |
+| 0 | 4 |
+| 0 | 3 |
+| 0 | 2 |
+| 0 | 1 |
+| 0 | 0 |

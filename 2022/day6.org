@@ -1,0 +1,80 @@
+#+title: Day6
+
+* Setup
+#+name: input-loader
+#+begin_src emacs-lisp :var filename=input.txt
+(with-temp-buffer
+  (insert-file-contents filename)
+  (format "%s" (buffer-string)))
+#+end_src
+
+* Day 6
+
+Example input:
+#+name: example-input-6
+#+begin_example
+zcfzfwzzqfrljwzlrfnpqdbhtmscgvjw
+#+end_example
+
+Loading puzzle input:
+#+name: input-6
+#+call: input-loader("input6.txt") :results none
+
+** Part 1
+For this puzzle, we create a sliding window of length 4 over the input, then
+we check if all 4 items are unique, if so, we use 0 as the marker, if not 1.
+This generates a list of 1s and 0s for each window, we then iterate over it
+adding up for each 1 we found, until we find a 0. Given that the amount of 1s
+represents the number of sliding windows without 4 unique characters, and that
+the sliding window steps 1 character at a time, when summing this to a base
+value of 4, we get the number of characters that had to be consumed until we
+found the marker.
+
+#+name: chars-to-start-of-packet
+#+begin_src emacs-lisp :var input=example-input-6
+(let* ((index 4) (in (string-to-list input)))
+  (-each-while (mapcar '(lambda (w) (if (< (length (-uniq w)) 4) 1 0))
+                       (-partition-in-steps 4 1 in))
+      (-compose #'not #'zerop)
+    (lambda (_) (setq index (+ index 1))))
+  index)
+#+end_src
+
+#+RESULTS:
+: 11
+
+The complexity of this algorithm depends on the first step that runs over all
+sliding windows. As we must look at all windows of 4 elements, this means we
+look at ~O(n-3)~ sliding windows (as the last 3 elements cant form a sliding
+window of 4 elements). This means the overall complexity is ~O(n)~, as the next
+loop goes over at most all sliding windows until we find a 0, and the ~length~
+and ~uniq~ instructions have a constant complexity ~O(4)~.
+
+#+call: chars-to-start-of-packet(input-6) :cache yes
+
+#+RESULTS[b7df66e97d7bf1662b71ed40966c10f7a17ad2c0]:
+: 1920
+
+** Part 2
+
+For the second part, nothing changes in the algorithm, except the size of the
+sliding window and the value of the baseline used in the final sum.
+
+#+name: chars-to-start-of-message
+#+begin_src emacs-lisp :var input=example-input-6
+(let* ((index 14) (in (string-to-list input)))
+  (-each-while (mapcar '(lambda (w) (if (< (length (-uniq w)) 14) 1 0))
+                       (-partition-in-steps 14 1 in))
+      (-compose #'not #'zerop)
+    (lambda (_) (setq index (+ index 1))))
+  index)
+#+end_src
+
+#+RESULTS: chars-to-start-of-message
+: 26
+
+Its complexity also stays the same as no logic changes happened: ~O(n)~.
+#+call: chars-to-start-of-message(input-6) :cache yes
+
+#+RESULTS[1bd36313d244cdc827ca1fad5e9945646aee83b5]:
+: 2334
