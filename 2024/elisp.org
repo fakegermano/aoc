@@ -1,0 +1,61 @@
+#+title: Elisp AoC tryouts
+
+* Day 1
+https://adventofcode.com/2024/day/1
+
+#+name: example-1a
+#+begin_example
+3   4
+4   3
+2   5
+1   3
+3   9
+3   3
+#+end_example
+
+#+name: input-file
+#+begin_src elisp :var fname="input-1a.txt"
+(f-read fname)
+#+end_src
+
+
+#+name: process-input
+#+begin_src elisp :var input=example-1a()
+(mapcar (lambda (e) (mapcar #'string-to-number (s-split "\s+" e))) (s-lines (s-trim input)))
+#+end_src
+
+#+RESULTS: process-input
+| 3 | 4 |
+| 4 | 3 |
+| 2 | 5 |
+| 1 | 3 |
+| 3 | 9 |
+| 3 | 3 |
+
+#+name: calculate-1a
+#+begin_src elisp :var input=process-input()
+(let ((left (sort (mapcar #'car input) #'<))
+      (right (sort (mapcar (lambda (l) (car (cdr l))) input) #'<))
+      (difference 0))
+  (cl-loop for l in left for r in right collect (setq difference (+ difference (abs (- l r)))))
+  difference)
+#+end_src
+
+#+RESULTS:
+: 11
+
+#+call: calculate-1a(process-input(input-file()))
+
+#+name: calculate-1b
+#+begin_src elisp :var input=process-input()
+(let ((left (sort (mapcar #'car input) #'<))
+      (right (sort (mapcar (lambda (l) (car (cdr l))) input) #'<))
+      (total 0))
+  (cl-loop for l in left collect (setq total (+ total (* l (count l right)))))
+  total)
+#+end_src
+
+#+RESULTS:
+: 31
+
+#+call: calculate-1b(process-input(input-file()))
