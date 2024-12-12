@@ -14,7 +14,7 @@ https://adventofcode.com/2024/day/1
 #+end_example
 
 #+name: input-file
-#+begin_src elisp :var fname="input-1a.txt"
+#+begin_src elisp :var fname=""
 (f-read fname)
 #+end_src
 
@@ -44,7 +44,7 @@ https://adventofcode.com/2024/day/1
 #+RESULTS: calculate-1a
 : 11
 
-#+call: calculate-1a(process-input(input-file()))
+#+call: calculate-1a(process-input(input-file("input-1.txt")))
 
 #+name: calculate-1b
 #+begin_src elisp :var input=process-input()
@@ -58,7 +58,7 @@ https://adventofcode.com/2024/day/1
 #+RESULTS:
 : 31
 
-#+call: calculate-1b(process-input(input-file()))
+#+call: calculate-1b(process-input(input-file("input-1.txt")))
 
 * Day 2
 
@@ -88,7 +88,7 @@ https://adventofcode.com/2024/day/1
 #+RESULTS:
 : 2
 
-#+call: calculate-2a(process-input(input-file("input-2a.txt")))
+#+call: calculate-2a(process-input(input-file("input-2.txt")))
 
 
 #+name: calculate-2b
@@ -112,4 +112,48 @@ https://adventofcode.com/2024/day/1
 #+RESULTS: calculate-2b
 : 4
 
-#+call: calculate-2b(process-input(input-file("input-2a.txt")))
+#+call: calculate-2b(process-input(input-file("input-2.txt")))
+
+* Day 3
+#+name: example-3a
+#+begin_example
+xmul(2,4)%&mul[3,7]!@^do_not_mul(5,5)+mul(32,64]then(mul(11,8)mul(8,5))
+#+end_example
+
+#+name: extract-3a
+#+begin_src elisp :var input=example-3a
+(cl-reduce #'+ (mapcar (lambda (m) (cl-reduce #'* (mapcar #'string-to-number (cdr m))))
+                       (s-match-strings-all (rx "mul(" (group (** 1 3 num)) "," (group (** 1 3 num)) ")") input)))
+#+end_src
+
+#+RESULTS: extract-3a
+: 161
+
+#+call: extract-3a(input-file("input-3.txt"))
+
+#+RESULTS:
+: 182780583
+
+#+name: example-3b
+#+begin_example
+xmul(2,4)&mul[3,7]!^don't()_mul(5,5)+mul(32,64](mul(11,8)undo()?mul(8,5))
+#+end_example
+
+#+name: extract-3b
+#+begin_src elisp :var input=example-3b
+(cl-reduce #'+ (let* ((mult 1))
+                 (mapcar (lambda (m) (cond ((s-equals? (cadr m) "mul") (* mult (string-to-number (caddr m)) (string-to-number (cadddr m))))
+                                           ((s-equals? (cadr m) "do") (setq mult 1) 0)
+                                           ((s-equals? (cadr m) "don't") (setq mult 0) 0)))
+                         (s-match-strings-all (rx (or (: (group-n 1 "mul") "(" (group (** 1 3 num)) "," (group (** 1 3 num)) ")")
+                                                      (: (group-n 1 "do") "()")
+                                                      (: (group-n 1 "don't") "()"))) input))))
+#+end_src
+
+#+RESULTS: extract-3b
+: 48
+
+#+call: extract-3b(input-file("input-3.txt"))
+
+#+RESULTS:
+: 90772405
