@@ -258,3 +258,6 @@ MXMXAXMASX
 
 #+RESULTS: find-x-mas
 : 9
+
+#+call: find-x-mas(process-input-chars(input-file("input-4.txt")))
+
