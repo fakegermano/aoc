@@ -35,13 +35,13 @@ https://adventofcode.com/2024/day/1
 #+name: calculate-1a
 #+begin_src elisp :var input=process-input()
 (let ((left (sort (mapcar #'car input) #'<))
-      (right (sort (mapcar (lambda (l) (car (cdr l))) input) #'<))
+      (right (sort (mapcar (lambda (l) (cadr l)) input) #'<))
       (difference 0))
   (cl-loop for l in left for r in right collect (setq difference (+ difference (abs (- l r)))))
   difference)
 #+end_src
 
-#+RESULTS:
+#+RESULTS: calculate-1a
 : 11
 
 #+call: calculate-1a(process-input(input-file()))
@@ -49,7 +49,7 @@ https://adventofcode.com/2024/day/1
 #+name: calculate-1b
 #+begin_src elisp :var input=process-input()
 (let ((left (sort (mapcar #'car input) #'<))
-      (right (sort (mapcar (lambda (l) (car (cdr l))) input) #'<))
+      (right (sort (mapcar (lambda (l) (cadr l)) input) #'<))
       (total 0))
   (cl-loop for l in left collect (setq total (+ total (* l (count l right)))))
   total)
@@ -59,3 +59,57 @@ https://adventofcode.com/2024/day/1
 : 31
 
 #+call: calculate-1b(process-input(input-file()))
+
+* Day 2
+
+#+name: example-2a
+#+begin_example
+7 6 4 2 1
+1 2 7 8 9
+9 7 6 2 1
+1 3 2 4 5
+8 6 4 4 1
+1 3 6 7 9
+#+end_example
+
+#+name: calculate-2a
+#+begin_src elisp :var input=process-input(example-2a)
+(defun safe (level)
+  "checks if a level is safe aka only increasing, only decreasing and by 1, 2 or 3"
+  (let ((diff (mapcar (lambda (l) (- (car l) (cdr l)))
+                      (cl-pairlis level (cdr level)))))
+    (or (cl-every (lambda (l) (and (< l 0)
+                                   (> l -4))) diff)
+        (cl-every (lambda (l) (and (> l 0)
+                                   (< l 4))) diff))))
+(cl-count t (mapcar #'safe input))
+#+end_src
+
+#+RESULTS:
+: 2
+
+#+call: calculate-2a(process-input(input-file("input-2a.txt")))
+
+
+#+name: calculate-2b
+#+begin_src elisp :var input=process-input(example-2a)
+(defun safe (level)
+  "checks if a level is safe aka only increasing, only decreasing and by 1, 2 or 3"
+  (let ((diff (mapcar (lambda (l) (- (car l) (cdr l)))
+                      (cl-pairlis level (cdr level)))))
+    (or (cl-every (lambda (l) (and (< l 0)
+                                   (> l -4))) diff)
+        (cl-every (lambda (l) (and (> l 0)
+                                   (< l 4))) diff))))
+(defun safe-modified (level)
+  "checks if a level is safe aka only increasing, only decreasing and by 1, 2 or 3"
+  (let ((sublevels (cons level (cl-mapcar (lambda (x i) (append (cl-subseq level 0 i) (cl-subseq level (1+ i)))) level (number-sequence 0 (length level))))))
+    (cl-count t (mapcar 'safe sublevels))))
+
+(cl-count-if (lambda (x) (> x 0)) (mapcar #'safe-modified input))
+#+end_src
+
+#+RESULTS: calculate-2b
+: 4
+
+#+call: calculate-2b(process-input(input-file("input-2a.txt")))
