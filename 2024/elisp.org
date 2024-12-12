@@ -261,3 +261,96 @@ MXMXAXMASX
 
 #+call: find-x-mas(process-input-chars(input-file("input-4.txt")))
 
+* Day 5
+
+#+name: example-5a
+#+begin_example
+47|53
+97|13
+97|61
+97|47
+75|29
+61|13
+75|53
+29|13
+97|29
+53|29
+61|53
+97|53
+61|29
+47|13
+75|47
+97|75
+47|61
+75|61
+47|29
+75|13
+53|13
+
+75,47,61,53,29
+97,61,53,29,13
+75,29,13
+75,97,47,61,53
+61,13,29
+97,13,75,29,47
+#+end_example
+
+#+name: parse-rules-updates
+#+begin_src elisp :var input=example-5a
+(defun print-matrix (matrix n)
+  "print adj matrix as 0 and 1"
+  (mapcar (lambda (r) (mapconcat (lambda (c) (if c "1" "0")) r "")) (seq-split matrix n)))
+(let* ((parsed (mapcar 's-lines (s-split "\n\n" (s-trim input))))
+       (rules (mapcar (lambda (r) (mapcar #'string-to-number (s-split "|" r))) (car parsed)))
+       (updates (mapcar (lambda (u) (mapcar #'string-to-number (s-split "," u))) (cadr parsed)))
+       (n (max (max (apply #'max (apply #'append rules)))
+               (max (apply #'max (apply #'append updates)))))
+       (matrix (make-vector (1- (* n n)) nil)))
+  (dolist (e rules)
+    (let* ((i (1- (car e)))
+           (j (1- (cadr e)))
+           (idx (+ (* i n) j)))
+      (aset matrix idx (not (aref matrix idx)))))
+  (cl-reduce #'+ (mapcar (lambda (up)
+                           (if (not (seq-contains-p (mapcar (lambda (e) (aref matrix (+ (* (1- (car e)) n) (1- (cdr e))))) (cl-pairlis up (cdr up)))
+                                                    nil))
+                               (nth (/ (length up) 2) up)
+                             0))
+                         updates)))
+#+end_src
+
+#+RESULTS: parse-rules-updates
+: 143
+
+#+call: parse-rules-updates(input-file("input-5.txt"))
+
+
+#+name: parse-rules-updates-correct
+#+begin_src elisp :var input=example-5a
+(defun print-matrix (matrix n)
+  "print adj matrix as 0 and 1"
+  (mapcar (lambda (r) (mapconcat (lambda (c) (if c "1" "0")) r "")) (seq-split matrix n)))
+(let* ((parsed (mapcar 's-lines (s-split "\n\n" (s-trim input))))
+       (rules (mapcar (lambda (r) (mapcar #'string-to-number (s-split "|" r))) (car parsed)))
+       (updates (mapcar (lambda (u) (mapcar #'string-to-number (s-split "," u))) (cadr parsed)))
+       (n (max (max (apply #'max (apply #'append rules)))
+               (max (apply #'max (apply #'append updates)))))
+       (matrix (make-vector (1- (* n n)) nil)))
+  (dolist (e rules)
+    (let* ((i (1- (car e)))
+           (j (1- (cadr e)))
+           (idx (+ (* i n) j)))
+      (aset matrix idx (not (aref matrix idx)))))
+  (cl-reduce #'+ (mapcar (lambda (up)
+                           (if (seq-contains-p (mapcar (lambda (e) (aref matrix (+ (* (1- (car e)) n) (1- (cdr e))))) (cl-pairlis up (cdr up)))
+                                               nil)
+                               (nth (/ (length up) 2) (seq-sort (lambda (u1 u2) (aref matrix (+ (* (1- u1) n) (1- u2)))) up))
+                             0))
+                         updates)))
+#+end_src
+
+#+RESULTS: parse-rules-updates-correct
+: 123
+
+#+call: parse-rules-updates-correct(input-file("input-5.txt"))
+
