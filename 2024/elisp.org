@@ -157,3 +157,107 @@ xmul(2,4)&mul[3,7]!^don't()_mul(5,5)+mul(32,64](mul(11,8)undo()?mul(8,5))
 
 #+RESULTS:
 : 90772405
+
+* Day 4
+
+#+name: example-4a
+#+begin_example
+MMMSXXMASM
+MSAMXMSMSA
+AMXSXMAAMM
+MSAMASMSMX
+XMASAMXAMM
+XXAMMXXAMA
+SMSMSASXSS
+SAXAMASAAA
+MAMMMXMMMM
+MXMXAXMASX
+#+end_example
+
+#+name: process-input-chars
+#+begin_src elisp :var input=example-4a
+(mapcar #'string-to-list (s-lines (s-trim input)))
+#+end_src
+
+#+RESULTS: process-input-chars
+| 77 | 77 | 77 | 83 | 88 | 88 | 77 | 65 | 83 | 77 |
+| 77 | 83 | 65 | 77 | 88 | 77 | 83 | 77 | 83 | 65 |
+| 65 | 77 | 88 | 83 | 88 | 77 | 65 | 65 | 77 | 77 |
+| 77 | 83 | 65 | 77 | 65 | 83 | 77 | 83 | 77 | 88 |
+| 88 | 77 | 65 | 83 | 65 | 77 | 88 | 65 | 77 | 77 |
+| 88 | 88 | 65 | 77 | 77 | 88 | 88 | 65 | 77 | 65 |
+| 83 | 77 | 83 | 77 | 83 | 65 | 83 | 88 | 83 | 83 |
+| 83 | 65 | 88 | 65 | 77 | 65 | 83 | 65 | 65 | 65 |
+| 77 | 65 | 77 | 77 | 77 | 88 | 77 | 77 | 77 | 77 |
+| 77 | 88 | 77 | 88 | 65 | 88 | 77 | 65 | 83 | 88 |
+
+#+name: find-xmas
+#+begin_src elisp :var input=process-input-chars(example-4a)
+(defun count-xmas (list-of-chars)
+  ""
+  (cl-reduce #'+ (mapcar (lambda (chars)
+                           (let* ((start 0)
+                                  (count 0)
+                                  (str (concat chars)))
+                             (while (string-match "XMAS" str start)
+                               (setq count (1+ count))
+                               (setq start (match-end 0)))
+                             count))
+                         list-of-chars)))
+(let* ((transposed (apply #'cl-mapcar #'list input))
+       (n (length input))
+       (diagonal-lr (make-list (1- (* 2 n)) nil))
+       (diagonal-rl (make-list (1- (* 2 n)) nil)))
+  (dotimes (i n)
+    (dotimes (j n)
+      (setf (elt diagonal-lr (+ i j)) (cons (nth j (nth i input)) (nth (+ i j) diagonal-lr)))
+      (setf (elt diagonal-rl (+ i j)) (cons (nth j (nth (1- (- n i)) input)) (nth (+ i j) diagonal-rl)))))
+  (cl-reduce #'+ (mapcar #'count-xmas (list input (mapcar #'reverse input)
+                                            transposed (mapcar #'reverse transposed)
+                                            diagonal-lr (mapcar #'reverse diagonal-lr)
+                                            diagonal-rl (mapcar #'reverse diagonal-rl)))))
+#+end_src
+
+#+RESULTS: find-xmas
+: 18
+
+#+call: find-xmas(process-input-chars(input-file("input-4.txt"))))
+
+#+name: find-x-mas
+#+begin_src elisp :var input=process-input-chars(example-4a)
+(let* ((n (length input)) (out))
+  (dotimes (i n)
+    (dotimes (j n)
+      (let* ((a (nth j (nth i input)))
+             (n1 (nth (1- j) (nth (1- i) input)))
+             (n2 (nth (1+ j) (nth (1+ i) input)))
+             (n3 (nth (1- j) (nth (1+ i) input)))
+             (n4 (nth (1+ j) (nth (1- i) input)))
+             (ns (list n1 n2 n3 n4)))
+        (when (and (= 0 (cl-count-if #'null ns))
+                   (> 0 (cl-count ?M ns))
+                   (= ?A a))
+          (push (list (string a) (concat ns)) out)))))
+  out)
+#+end_src
+
+#+RESULTS: find-x-mas
+| A | SMMX |
+| A | XMMS |
+| A | SMMS |
+| A | SMMS |
+| A | SMMS |
+| A | SMMS |
+| A | MSMX |
+| A | XSSM |
+| A | MMMS |
+| A | MMXM |
+| A | MXMS |
+| A | SMXM |
+| A | SMSM |
+| A | MSMS |
+| A | SMMS |
+| A | MSSM |
+| A | MSMS |
+| A | MSMS |
+| A | MSSS |
