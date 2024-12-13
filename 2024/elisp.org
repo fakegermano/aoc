@@ -354,3 +354,64 @@ MXMXAXMASX
 
 #+call: parse-rules-updates-correct(input-file("input-5.txt"))
 
+* Day 6
+
+#+name: example-6a
+#+begin_example
+....#.....
+.........#
+..........
+..#.......
+.......#..
+..........
+.#..^.....
+........#.
+#.........
+......#...
+#+end_example
+
+#+name: simulate-guard-route
+#+begin_src elisp :var input=example-6a
+(cl-defun print-matrix (matrix m &optional (mapfn #'identity))
+  "print matrix as chars"
+  (s-join "\n" (mapcar 'concat (seq-split (mapcar mapfn matrix) n))))
+(let* ((parsed (s-lines (s-trim input)))
+       (n (length (car parsed)))
+       (m (length parsed))
+       (matrix (apply 'vconcat (mapcar 'string-to-vector parsed)))
+       (visited (make-vector (length matrix) nil))
+       (pos (seq-position matrix (seq-find (lambda (c) (or (= ?^ c)
+                                                         (= ?v c)
+                                                         (= ?> c)
+                                                         (= ?< c)))
+                                         matrix)))
+       (i (/ pos m))
+       (j (% pos n))
+       (dir (pcase (aref matrix pos)
+              (?^ '(-1 . 0))
+              (?v '(1 . 0))
+              (?> '(0 . 1))
+              (?< '(0 . -1)))))
+  (while (and (>= i 0) (< i m)
+              (>= j 0) (< j n))
+    (aset visited pos t)
+    (if (and (>= (+ i (car dir)) 0) (< (+ i (car dir)) m)
+             (>= (+ j (cdr dir)) 0) (< (+ j (cdr dir)) n)
+             (= (aref matrix (+ (* (+ i (car dir)) n) (+ j (cdr dir)))) ?#))
+        (pcase dir
+          ('(-1 . 0) (setq dir '(0 . 1)))
+          ('(0 . 1) (setq dir '(1 . 0)))
+          ('(1 . 0) (setq dir '(0 . -1)))
+          ('(0 . -1) (setq dir '(-1 . 0)))))
+    (setq i (+ i (car dir)))
+    (setq j (+ j (cdr dir)))
+    (setq pos (+ (* i n) j)))
+  (list pos dir matrix visited)
+  (print-matrix visited m (lambda (c) (if c ?X ?.)))
+  (seq-count #'identity visited))
+#+end_src
+
+#+RESULTS: simulate-guard-route
+: 41
+
+#+call: simulate-guard-route(input-file("input-6.txt"))
