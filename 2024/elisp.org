@@ -415,3 +415,95 @@ MXMXAXMASX
 : 41
 
 #+call: simulate-guard-route(input-file("input-6.txt"))
+
+#+name: simulate-guard-route-add-obstruction
+#+begin_src elisp :var input=example-6a
+(cl-defun print-matrix (matrix m &optional (mapfn #'identity))
+  "print matrix as chars"
+  (s-join "\n" (mapcar 'concat (seq-split (mapcar mapfn matrix) n))))
+(with-output-to-temp-buffer "*aoc-2024-day6b*"
+  (let* ((parsed (s-lines (s-trim input)))
+         (n (length (car parsed)))
+         (m (length parsed))
+         (matrix (apply 'vconcat (mapcar 'string-to-vector parsed)))
+         (visited (make-vector (length matrix) nil))
+         (stuck-pos (make-hash-table :test 'equal))
+         (pos (seq-position matrix (seq-find (lambda (c) (or (= ?^ c)
+                                                             (= ?v c)
+                                                             (= ?> c)
+                                                             (= ?< c)))
+                                             matrix)))
+         (s-pos pos)
+         (i (/ pos m))
+         (j (% pos n))
+         (dir (pcase (aref matrix pos)
+                (?^ '(-1 . 0))
+                (?v '(1 . 0))
+                (?> '(0 . 1))
+                (?< '(0 . -1))))
+         (s-dir dir))
+    ;; get all visited positions
+    (while (and (>= i 0) (< i m)
+                (>= j 0) (< j n))
+      (aset visited pos t)
+      (if (and (>= (+ i (car dir)) 0) (< (+ i (car dir)) m)
+               (>= (+ j (cdr dir)) 0) (< (+ j (cdr dir)) n)
+               (= (aref matrix (+ (* (+ i (car dir)) n) (+ j (cdr dir)))) ?#))
+          (pcase dir
+            ('(-1 . 0) (setq dir '(0 . 1)))
+            ('(0 . 1) (setq dir '(1 . 0)))
+            ('(1 . 0) (setq dir '(0 . -1)))
+            ('(0 . -1) (setq dir '(-1 . 0)))))
+      (setq i (+ i (car dir)))
+      (setq j (+ j (cdr dir)))
+      (setq pos (+ (* i n) j)))
+    ;; set start pos as not valid for obstruction
+    (aset visited s-pos nil)
+    (dolist (obs-pos (number-sequence 0 (1- (length visited))))
+      (when (aref visited obs-pos)
+        ;; reset position
+        (setq i (/ s-pos m))
+        (setq j (% s-pos n))
+        (setq pos s-pos)
+        (setq dir s-dir)
+        (aset matrix obs-pos ?#)
+        (let* ((obstructions (make-vector (length matrix) nil))
+               (visited (make-bool-vector (length matrix) nil)))
+          (when (catch 'done
+                  (while (and (>= i 0) (< i m)
+                              (>= j 0) (< j n))
+                    (setq pos (+ (* i n) j))
+                    (aset visited pos t)
+                    (let* ((i-la (+ i (car dir)))
+                           (j-la (+ j (cdr dir)))
+                           (pos-la (+ (* i-la n) j-la)))
+                      (if (and (>= i-la 0) (< i-la m)
+                                 (>= j-la 0) (< j-la n)
+                                 (= (aref matrix pos-la) ?#))
+                          (progn
+                            ;; its a loop if we hit the same obstruction
+                            ;; with the same direction of movement twice
+                            (when (and (aref obstructions pos-la)
+                                       (equal (aref obstructions pos-la) dir))
+                              (throw 'done t))
+                            (aset obstructions pos-la dir)
+                            (pcase dir
+                              ('(-1 . 0) (setq dir '(0 . 1)))
+                              ('(0 . 1) (setq dir '(1 . 0)))
+                              ('(1 . 0) (setq dir '(0 . -1)))
+                              ('(0 . -1) (setq dir '(-1 . 0)))))
+                        (progn
+                          (setq i (+ i (car dir)))
+                          (setq j (+ j (cdr dir)))))))
+                  (throw 'done nil))
+            ;;(print! "possible loop %d\n%s\n\n%s\n" pos (print-matrix obstructions n (lambda (c) (if c ?# ?.))) (print-matrix visited n (lambda (c) (if c ?X ?.))))
+            (puthash visited t stuck-pos)))
+        (aset matrix obs-pos ?.)))
+    (hash-table-count stuck-pos)))
+#+end_src
+
+#+RESULTS:
+: 6
+
+** Note: this is extremely slow but idk
+#+call: simulate-guard-route-add-obstruction(input-file("input-6.txt"))
