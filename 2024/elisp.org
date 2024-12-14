@@ -593,3 +593,127 @@ car of the list is the result and cdr is a list of all number pairs in order"
 
 
 #+call: check-equations-concat(input-file("input-7.txt"))
+
+* Day 8
+
+#+name: example-8a
+#+begin_example
+............
+........0...
+.....0......
+.......0....
+....0.......
+......A.....
+............
+............
+........A...
+.........A..
+............
+............
+#+end_example
+
+#+name: count-antinodes
+#+begin_src elisp :var input=example-8a
+(let* ((freqs (make-hash-table))
+       (parsed (vconcat (mapcar 'string-to-vector (s-lines (s-trim input)))))
+       (m (length parsed))
+       (n (length (aref parsed 0)))
+       (c ?.)
+       (antinodes (make-hash-table :test 'equal)))
+  (dotimes (i m)
+    (dotimes (j n)
+      (setq c (aref (aref parsed i) j))
+      (when (not (= c ?.))
+        (puthash c (cons (cons i j) (gethash c freqs nil)) freqs))))
+  (maphash (lambda (freq positions)
+             ;;(message "%s %s" freq positions)
+             (mapcar (lambda (p1)
+                       (mapcar (lambda (p2)
+                                 (unless (equal p1 p2)
+                                   ;;(message "%s %s" p1 p2)
+                                   (let* ((dif (cons (- (car p1) (car p2))
+                                                     (- (cdr p1) (cdr p2))))
+                                          (an (cons (+ (car p1) (car dif))
+                                                    (+ (cdr p1) (cdr dif)))))
+                                     ;;(message "%s %s" dif an)
+                                     (when (and (>= (car an) 0)
+                                                (< (car an) m)
+                                                (>= (cdr an) 0)
+                                                (< (cdr an) n))
+                                       (puthash an t antinodes)))))
+                               positions))
+                        positions))
+           freqs)
+  (let (antinodeslist)
+    (maphash (lambda (an _) (push an antinodeslist)) antinodes)
+    ;;antinodeslist
+    (hash-table-count antinodes)))
+#+end_src
+
+#+RESULTS:
+: 14
+
+#+call: count-antinodes(input-file("input-8.txt"))
+
+
+#+name: count-antinodes-harmonics
+#+begin_src elisp :var input=example-8a
+(defun print-map (map &optional antinodes)
+  "prints the map with the antinodes"
+  (require 'calc-ext)
+  (let ((n (length map))
+        (flat-map (apply 'vconcat (mapcar #'identity map))))
+    (when antinodes
+      (mapcar (lambda (an)
+                (when (= (aref flat-map (+ (* (car an) n) (cdr an))) ?.)
+                  (aset flat-map (+ (* (car an) n) (cdr an)) ?#)))
+              antinodes))
+    (s-join "\n" (mapcar 'concat (seq-split flat-map n)))))
+(let* ((freqs (make-hash-table))
+       (parsed (vconcat (mapcar 'string-to-vector (s-lines (s-trim input)))))
+       (m (length parsed))
+       (n (length (aref parsed 0)))
+       (c ?.)
+       (antinodes (make-hash-table :test 'equal)))
+  (dotimes (i m)
+    (dotimes (j n)
+      (setq c (aref (aref parsed i) j))
+      (when (not (= c ?.))
+        (puthash c (cons (cons i j) (gethash c freqs nil)) freqs))))
+  (maphash (lambda (freq positions)
+             ;;(message "%s %s" freq positions)
+             (mapcar (lambda (p1)
+                       (when (> (length positions) 2)
+                         (puthash p1 t antinodes))
+                       (mapcar (lambda (p2)
+                                 (unless (equal p1 p2)
+                                   ;;(message "%s %s" p1 p2)
+                                   (let* ((dif (cons (- (car p1) (car p2))
+                                                     (- (cdr p1) (cdr p2))))
+                                          (an (cons (+ (car p1) (car dif))
+                                                    (+ (cdr p1) (cdr dif)))))
+                                     ;;(message "%s %s" dif an)
+                                     (while (and (>= (car an) 0)
+                                                 (< (car an) m)
+                                                 (>= (cdr an) 0)
+                                                 (< (cdr an) n))
+                                       (puthash an t antinodes)
+                                       (setq an (cons (+ (car an) (car dif))
+                                                      (+ (cdr an) (cdr dif))))))))
+                               positions))
+                        positions))
+           freqs)
+  (let (antinodeslist)
+    (maphash (lambda (an _)
+               (push an antinodeslist)
+               (message "%s" an))
+             antinodes)
+    ;;(message "%s" (print-map parsed antinodeslist))
+    ;;antinodeslist
+    (hash-table-count antinodes)))
+#+end_src
+
+#+RESULTS: count-antinodes-harmonics
+: 34
+
+#+call: count-antinodes-harmonics(input-file("input-8.txt"))
