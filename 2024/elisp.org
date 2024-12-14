@@ -507,3 +507,89 @@ MXMXAXMASX
 
 ** Note: this is extremely slow but idk
 #+call: simulate-guard-route-add-obstruction(input-file("input-6.txt"))
+* Day 7
+
+#+name: example-7a
+#+begin_example
+190: 10 19
+3267: 81 40 27
+83: 17 5
+156: 15 6
+7290: 6 8 6 15
+161011: 16 10 13
+192: 17 8 14
+21037: 9 7 18 13
+292: 11 6 16 20
+#+end_example
+
+#+name: check-equations
+#+begin_src elisp :var input=example-7a
+(defun parse-equations (l)
+  "parse a line that contains an equation into a list
+car of the list is the result and cdr is a list of all number pairs in order"
+  (let* ((line (s-split ":" l))
+         (result (string-to-number (car line)))
+         (numbers (mapcar 'string-to-number (s-split " " (s-trim (cadr line))))))
+    (cons result numbers)))
+(defun cat (a b)
+  "concatenates numbers a and b"
+  (string-to-number (concat (number-to-string a) (number-to-string b))))
+(defun create-combinations (nums)
+  "checks if equation is valid"
+  (if (= (length nums) 2)
+      (list (+ (car nums) (cadr nums))
+            (* (car nums) (cadr nums)))
+    (apply 'append (mapcar (lambda (r)
+                      (cond
+                       ((sequencep r) (mapcar (lambda (sr) (list (+ (car nums) sr)
+                                                                 (* (car nums) sr)))
+                                              r))
+                       ((numberp r) (list (+ (car nums) r)
+                                          (* (car nums) r)))))
+                    (create-combinations (cdr nums))))))
+(let* ((equations (mapcar 'parse-equations (s-lines (s-trim input)))))
+  (apply #'+ (cl-remove nil (mapcar (lambda (e) (cl-find (car e) (create-combinations (reverse (cdr e))))) equations))))
+#+end_src
+
+#+RESULTS: check-equations
+: 3749
+
+#+call: check-equations(input-file("input-7.txt"))
+
+#+name: check-equations-concat
+#+begin_src elisp :var input=example-7a
+(defun parse-equations (l)
+  "parse a line that contains an equation into a list
+car of the list is the result and cdr is a list of all number pairs in order"
+  (let* ((line (s-split ":" l))
+         (result (string-to-number (car line)))
+         (numbers (mapcar 'string-to-number (s-split " " (s-trim (cadr line))))))
+    (cons result numbers)))
+(defun cat (a b)
+  "concatenates numbers a and b"
+  (string-to-number (concat (number-to-string a) (number-to-string b))))
+(defun create-combinations (nums)
+  "checks if equation is valid"
+  (if (= (length nums) 2)
+      (list (+ (car nums) (cadr nums))
+            (* (car nums) (cadr nums))
+            (cat (cadr nums) (car nums)))
+    (apply 'append (mapcar (lambda (r)
+                      (cond
+                       ((sequencep r) (mapcar (lambda (sr) (list (+ (car nums) sr)
+                                                                 (* (car nums) sr)
+                                                                 (cat sr (car nums))))
+                                              r))
+                       ((numberp r) (list (+ (car nums) r)
+                                          (* (car nums) r)
+                                          (cat r (car nums))))))
+                    (create-combinations (cdr nums))))))
+(let* ((equations (mapcar 'parse-equations (s-lines (s-trim input)))))
+  (apply #'+ (cl-remove nil (mapcar (lambda (e) (cl-find (car e) (create-combinations (reverse (cdr e))))) equations))))
+#+end_src
+
+#+RESULTS: check-equations-concat
+: 11387
+
+
+#+call: check-equations-concat(input-file("input-7.txt"))
