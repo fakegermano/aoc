@@ -255,7 +255,6 @@ MXMXAXMASX
 : 9
 
 #+call: find-x-mas(process-input-chars(input-file("input-4.txt")))
-
 * Day 5
 
 #+name: example-5a
@@ -830,3 +829,218 @@ car of the list is the result and cdr is a list of all number pairs in order"
 
 ** This is EXTREMELY slow. I should probably redo it and find a more efficient way
 #+call: compress-contiguous-and-checksum(input-file("input-9.txt"))
+
+* Day 10
+
+#+name: example-10a
+#+begin_example
+0123
+1234
+8765
+9876
+#+end_example
+
+#+name: example-10b
+#+begin_example
+89010123
+78121874
+87430965
+96549874
+45678903
+32019012
+01329801
+10456732
+#+end_example
+
+#+name: count-trail-scores
+#+begin_src elisp :var input=example-10a
+(defun parse-heightmap (in)
+  "parse input as a vector of vectors"
+  (vconcat (mapcar (lambda (l) (vconcat (mapcar (lambda (c) (- c ?0)) l))) (mapcar 'string-to-vector (s-lines (s-trim input))))))
+(defun neighbours (map pos)
+  "from a position return a list of all reachable neighbors in the map"
+  (let ((neighbors)
+        (m (length map))
+        (n (length (aref map 0)))
+        (current-height (aref (aref map (car pos)) (cdr pos))))
+    (dolist (delta '((-1 . 0) (1 . 0) (0 . -1) (0 . 1)))
+      (if-let ((neigh (cons (+ (car pos) (car delta))
+                            (+ (cdr pos) (cdr delta))))
+               (_ (and (>= (car neigh) 0)
+                       (< (car neigh) m)
+                       (>= (cdr neigh) 0)
+                       (< (cdr neigh) n)))
+               (neigh-height (aref (aref map (car neigh)) (cdr neigh)))
+               (_ (and (= neigh-height (1+ current-height)))))
+          (push neigh neighbors)))
+    neighbors))
+(defun trailheads (map)
+  "return a list of all start positions (labeled 0)"
+  (let ((trailheads))
+    (dotimes (i (length map))
+      (dotimes (j (length (aref map i)))
+        (when (= (aref (aref map i) j) 0)
+          (push (cons i j) trailheads))))
+    trailheads))
+(defun dfs-trailhead-reaches-height (map trailhead height)
+  "predicate that traverses map in dfs and returns all positions of target height reached"
+  (let* ((m (length map))
+         (n (length (aref map 0)))
+         (stack (list trailhead))
+         (visited (make-vector (* m n) nil))
+         (reached))
+    (while-let ((current (pop stack))
+                (c-height (aref (aref map (car current)) (cdr current)))
+                (pos (+ (* (car current) n) (cdr current))))
+      (unless (aref visited pos)
+        (aset visited pos t)
+        (when (= c-height height)
+          (push current reached))
+        (mapc (lambda (neigh)
+                (push neigh stack))
+              (neighbours map current))))
+    reached))
+
+(let* ((map (parse-heightmap input))
+       (trailheads (trailheads map)))
+  (apply #'+ (mapcar 'length (mapcar (lambda (trailhead) (dfs-trailhead-reaches-height map trailhead 9)) trailheads))))
+#+end_src
+
+#+RESULTS: count-trail-scores
+: 1
+
+
+#+call: count-trail-scores(example-10b)
+
+#+RESULTS:
+: 36
+
+#+call: count-trail-scores(input-file("input-10.txt"))
+
+#+name: count-trail-ratings
+#+begin_src elisp :var input=example-10a
+(defun parse-heightmap (in)
+  "parse input as a vector of vectors"
+  (vconcat (mapcar (lambda (l) (vconcat (mapcar (lambda (c) (- c ?0)) l))) (mapcar 'string-to-vector (s-lines (s-trim input))))))
+(defun print-map (map n)
+  (mapconcat (lambda (s) (concat s "\n")) (mapcar (lambda (l) (concat (vconcat l))) (seq-split map n)) ""))
+(defun neighbours (map pos)
+  "from a position return a list of all reachable neighbors in the map"
+  (let ((neighbors)
+        (m (length map))
+        (n (length (aref map 0)))
+        (current-height (aref (aref map (car pos)) (cdr pos))))
+    (dolist (delta '((-1 . 0) (1 . 0) (0 . -1) (0 . 1)))
+      (if-let ((neigh (cons (+ (car pos) (car delta))
+                            (+ (cdr pos) (cdr delta))))
+               (_ (and (>= (car neigh) 0)
+                       (< (car neigh) m)
+                       (>= (cdr neigh) 0)
+                       (< (cdr neigh) n)))
+               (neigh-height (aref (aref map (car neigh)) (cdr neigh)))
+               (_ (and (= neigh-height (1+ current-height)))))
+          (push neigh neighbors)))
+    neighbors))
+(defun trailheads (map)
+  "return a list of all start positions (labeled 0)"
+  (let ((trailheads))
+    (dotimes (i (length map))
+      (dotimes (j (length (aref map i)))
+        (when (= (aref (aref map i) j) 0)
+          (push (cons i j) trailheads))))
+    trailheads))
+(defun bfs-trailhead-paths-to-height (map trailhead height)
+  "predicate that traverses map in dfs and returns all positions of target height reached"
+  (let* ((m (length map))
+         (n (length (aref map 0)))
+         (queue (make-queue))
+         (visited (make-vector (* m n) nil))
+         (paths))
+    (queue-enqueue queue (list trailhead))
+    (while-let ((current-path (queue-dequeue queue))
+                (current (car current-path))
+                (pos (+ (* (car current) n) (cdr current)))
+                (current-height (aref (aref map (car current)) (cdr current))))
+      (aset visited pos t)
+      (if (= current-height height)
+          (push (reverse current-path) paths)
+        (mapc (lambda (neigh)
+                (when-let* ((neigh-pos (+ (* (car neigh) n) (cdr neigh)))
+                            (_ (not (aref visited neigh-pos))))
+                  (queue-enqueue queue (cons neigh current-path))))
+              (neighbours map current))))
+    paths))
+
+(let* ((map (parse-heightmap input))
+       (trailheads (trailheads map)))
+  (apply #'+ (mapcar 'length (mapcar (lambda (paths)
+                                       (mapcar (lambda (p)
+                                                 (let* ((m (length map))
+                                                        (n (length (aref map 0)))
+                                                        (pmap (make-vector (* m n) ?.)))
+                                                   (dolist (c p)
+                                                     (aset pmap (+ (* (car c) n) (cdr c)) ?#))
+                                                   ;;(message "\n%s\n%s\n" p (print-map pmap n))
+                                                   p))
+                                               paths))
+                                     (mapcar (lambda (trailhead) (bfs-trailhead-paths-to-height map trailhead 9)) trailheads)))))
+#+end_src
+
+#+RESULTS: count-trail-ratings
+: 16
+
+#+name: example-10c
+#+begin_example
+9965402
+9643213
+9757624
+9865435
+9979846
+9787657
+9999879
+#+end_example
+
+#+name: example-10d
+#+begin_example
+9990999
+9991998
+9992997
+6543456
+7659987
+8769222
+9879222
+#+end_example
+
+#+name: example-10e
+#+begin_example
+012345
+123456
+234567
+345678
+496789
+567891
+#+end_example
+
+
+#+call: count-trail-ratings(example-10c)
+
+#+RESULTS:
+: 3
+
+
+#+call: count-trail-ratings(example-10d)
+
+#+RESULTS:
+: 13
+
+#+call: count-trail-ratings(example-10e)
+
+#+RESULTS:
+: 227
+
+#+call: count-trail-ratings(example-10b)
+
+#+RESULTS:
+: 81
+
+#+call: count-trail-ratings(input-file("input-10.txt"))
