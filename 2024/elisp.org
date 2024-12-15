@@ -1,8 +1,6 @@
 #+title: Elisp AoC tryouts
 
 * Day 1
-https://adventofcode.com/2024/day/1
-
 #+name: example-1a
 #+begin_example
 3   4
@@ -217,9 +215,6 @@ MXMXAXMASX
                                             diagonal-lr (mapcar #'reverse diagonal-lr)
                                             diagonal-rl (mapcar #'reverse diagonal-rl)))))
 #+end_src
-
-#+RESULTS: find-xmas
-: 18
 
 #+call: find-xmas(process-input-chars(input-file("input-4.txt"))))
 
@@ -717,3 +712,121 @@ car of the list is the result and cdr is a list of all number pairs in order"
 : 34
 
 #+call: count-antinodes-harmonics(input-file("input-8.txt"))
+
+* Day 9
+
+#+name: example-9a
+#+begin_example
+2333133121414131402
+#+end_example
+
+#+name: compress-and-checksum
+#+begin_src elisp :var input=example-9a
+(let* ((parsed (vconcat (mapcar (lambda (c) (- c ?0)) (string-to-vector (s-trim input)))))
+       (memory (make-vector (apply '+ (mapcar 'identity parsed)) -1))
+       (free)
+       (occupied)
+       (ids (make-hash-table))
+       (id 0)
+       (k 0))
+  (dotimes (i (length parsed))
+    (if (= (% i 2) 0)
+        (progn
+          (setq id (hash-table-count ids))
+          (dotimes (j (aref parsed i))
+            (aset memory (+ k j) id)
+            (push (+ k j) occupied))
+          (puthash id t ids))
+      (dotimes (j (aref parsed i))
+        (push (+ k j) free)))
+    (setq k (+ k (aref parsed i))))
+  (setq free (reverse free))
+  (while-let ((fs (pop free))
+              (os (pop occupied))
+              (_ (< fs os)))
+    (aset memory fs (aref memory os))
+    (aset memory os -1))
+  (let ((checksum 0)
+        (i 0))
+    (while-let ((id (aref memory i))
+                (_ (> id -1)))
+      (setq checksum (+ (* i id) checksum))
+      (setq i (1+ i)))
+    checksum))
+#+end_src
+
+#+RESULTS: compress-and-checksum
+: 1928
+
+#+call: compress-and-checksum(input-file("input-9.txt"))
+
+#+name: compress-contiguous-and-checksum
+#+begin_src elisp :var input=example-9a
+(setq gc-cons-threshold most-positive-fixnum ; 2^61 bytes
+      gc-cons-percentage 0.7)
+(let* ((parsed (vconcat (mapcar (lambda (c) (- c ?0)) (string-to-vector (s-trim input)))))
+       (memory (make-hash-table))
+       (free-by-size (make-hash-table))
+       (file-ids)
+       (free-ids)
+       (pos 0)
+       (checksum 0)
+       (id 0))
+  (dotimes (i (length parsed))
+    (if-let ((size (aref parsed i))
+             (_ (= (% i 2) 0)))
+        (progn
+          (setq id (length file-ids))
+          (puthash id (cons pos size) memory)
+          (push id file-ids)
+          (setq pos (+ pos size)))
+      (progn
+        (when (> size 0)
+          (setq id (length free-ids))
+          (puthash (- id) (cons pos size) memory)
+          (push (- id) free-ids)
+          (setq pos (+ pos size))))))
+  (setq free-ids (vconcat (reverse free-ids)))
+  (dolist (id file-ids)
+    (when-let* ((file (gethash id memory))
+                (file-pos (car file))
+                (file-size (cdr file))
+                (free-id-pos (cl-position-if (lambda (fid)
+                                               (if-let* ((tmp-free (gethash fid memory))
+                                                           (tmp-pos (car tmp-free))
+                                                           (tmp-size (cdr tmp-free))
+                                                           (_ (and (<= file-size tmp-size)
+                                                                   (>= file-pos tmp-pos))))
+                                                   t
+                                                 nil))
+                                             free-ids))
+                (free-id (aref free-ids free-id-pos))
+                (free (gethash free-id memory))
+                (free-pos (car free))
+                (free-size (cdr free)))
+      ;;(message "%d %s %s %d %d" id file free free-id (hash-table-count memory))
+      (puthash id (cons free-pos file-size) memory)
+      (setq free-size (- free-size file-size))
+      (if (> free-size 0)
+          (puthash free-id (cons (+ free-pos file-size) free-size) memory)
+        (progn
+          (cl-delete free-id free-ids)
+          (remhash free-id memory)))
+      ))
+
+  (setq gc-cons-threshold  16777216; ; back to default
+        gc-cons-percentage 0.1)
+  (maphash (lambda (id file)
+             (when (>= id -1)
+               (dotimes (i (cdr file))
+                 (setq checksum (+ checksum (* id (+ (car file) i)))))))
+           memory)
+  checksum)
+
+#+end_src
+
+#+RESULTS: compress-contiguous-and-checksum
+: 2858
+
+** This is EXTREMELY slow. I should probably redo it and find a more efficient way
+#+call: compress-contiguous-and-checksum(input-file("input-9.txt"))
