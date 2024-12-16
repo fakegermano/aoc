@@ -1,0 +1,120 @@
+#+title: Elisp 10to20
+
+#+name: input-file
+#+begin_src elisp :var fname=""
+(f-read fname)
+#+end_src
+
+
+* Day 11
+
+#+name: example-11a
+#+begin_example
+125 17
+#+end_example
+
+#+name: simulate-blinks
+#+begin_src elisp :var input=example-11a :var blinks=6
+(defun split-digits-evenp (number)
+  "splits the digits of a number in half if even else return nil"
+  (when-let* ((digits (number-to-string number))
+              (len (length digits))
+              (_ (cl-evenp len))
+              (mid (/ len 2)))
+    (mapcar 'string-to-number (list (substring digits 0 mid)
+                                    (substring digits mid len)))))
+(defun blink-sim (stones blinks)
+  "return len of arrengement after blinks"
+  (let ((memo (make-hash-table)))
+    (puthash 0 '(1) memo)
+    (puthash 1 '(2024) memo)
+    (dotimes (i blinks)
+      (setq stones (apply 'append (mapcar (lambda (stone)
+                                     (or (gethash stone memo)
+                                         (puthash stone (if-let ((split (split-digits-evenp stone)))
+                                                            split
+                                                          (list (* stone 2024)))
+                                                  memo)))
+                                   stones))))
+    (length stones)))
+
+(let* ((stones (mapcar 'string-to-number (s-split " " (s-trim input)))))
+  (blink-sim stones blinks))
+#+end_src
+
+#+RESULTS: simulate-blinks
+: 22
+
+#+call: simulate-blinks(input=input-file("input-11.txt"),blinks=25)
+
+#+name: count-blink
+#+begin_src elisp :var input=example-11a :var blinks=6
+(defun split-digits-evenp (number)
+  "splits the digits of a number in half if even else return nil"
+  (when-let* ((digits (number-to-string number))
+              (len (length digits))
+              (_ (cl-evenp len))
+              (mid (/ len 2)))
+    (mapcar 'string-to-number (list (substring digits 0 mid)
+                                    (substring digits mid len)))))
+
+(defun blink-stone (stone blink-memo)
+  "return the list of the result of blinking to the stone"
+  (or (gethash stone blink-memo)
+      (puthash stone (if-let ((split (split-digits-evenp stone)))
+                         split
+                       (list (* stone 2024)))
+               blink-memo)))
+
+(defun print-count (stones-count)
+  "print stones count hash table"
+  (let ((counts))
+    (maphash (lambda (stone count)
+               (push (list stone count) counts))
+             stones-count)
+    (message "%s" counts)))
+
+(defun blink (stones blink-memo)
+  "count number of stones after blinks"
+  ;;(print-count stones)
+  (let ((next-stones (make-hash-table)))
+    (maphash (lambda (stone count)
+               (mapc (lambda (next-stone)
+                       (if-let ((next-count (gethash next-stone next-stones)))
+                           (puthash next-stone (+ next-count count) next-stones)
+                         (puthash next-stone count next-stones))
+                       ;;(print-count next-stones)
+                       )
+                     (blink-stone stone blink-memo)))
+             stones)
+    next-stones))
+
+(let* ((stones (mapcar 'string-to-number (s-split " " (s-trim input))))
+       (stones-count (make-hash-table))
+       (blink-memo (make-hash-table))
+       (total 0))
+  (mapc (lambda (stone)
+          (if-let ((count (gethash stone stones-count)))
+              (puthash stone (1+ count) stones-count)
+            (puthash stone 1 stones-count)))
+        stones)
+  (puthash 0 '(1) blink-memo)
+  (dotimes (i blinks)
+    (setq stones-count (blink stones-count blink-memo)))
+  (maphash (lambda (_ count) (setq total (+ total count))) stones-count)
+  total)
+#+end_src
+
+#+RESULTS: count-blink
+: 22
+
+#+call: count-blink(blinks=25)
+
+#+RESULTS:
+: 55312
+
+#+call: count-blink(input=input-file("input-11.txt"),blinks=25)
+
+
+#+call: count-blink(input=input-file("input-11.txt"),blinks=75)
+

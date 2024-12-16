@@ -1044,3 +1044,4 @@ car of the list is the result and cdr is a list of all number pairs in order"
 : 81
 
 #+call: count-trail-ratings(input-file("input-10.txt"))
+
