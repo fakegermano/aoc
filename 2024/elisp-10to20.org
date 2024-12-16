@@ -118,3 +118,110 @@
 
 #+call: count-blink(input=input-file("input-11.txt"),blinks=75)
 
+
+
+* Day 12
+
+#+name: example-12a
+#+begin_example
+AAAA
+BBCD
+BBCC
+EEEC
+#+end_example
+
+#+name: example-12b
+#+begin_example
+OOOOO
+OXOXO
+OOOOO
+OXOXO
+OOOOO
+#+end_example
+
+#+name: example-12c
+#+begin_example
+RRRRIICCFF
+RRRRIICCCF
+VVRRRCCFFF
+VVRCCCJFFF
+VVVVCJJCFE
+VVIVCCJJEE
+VVIIICJJEE
+MIIIIIJJEE
+MIIISIJEEE
+MMMISSJEEE
+#+end_example
+
+#+name: calculate-price
+#+begin_src elisp :var input=example-12a
+(defun flood-fill-area-perimeter (farm seed)
+  "uses flood-fill algorithm to find area and perimeter"
+  (let* ((m (length farm))
+         (n (length (aref farm 0)))
+         (plant (aref (aref farm (car seed)) (cdr seed)))
+         (stack)
+         (area)
+         (perimeter)
+         (insidep (lambda (node)
+                    (let ((inside (and (>= (car node) 0)
+                                       (< (car node) m)
+                                       (>= (cdr node) 0)
+                                       (< (cdr node) n)
+                                       (= (aref (aref farm (car node)) (cdr node)) plant))))
+                      inside))))
+    (push seed stack)
+    (while-let ((node (pop stack)))
+      (if (funcall insidep node)
+          (unless (member node area)
+            (push node area)
+            (mapc (lambda (side)
+                    (push (cons (+ (car node) (car side)) (+ (cdr node) (cdr side)))
+                          stack))
+                  '((-1 . 0) (1 . 0) (0 . -1) (0 . 1))))
+        (push node perimeter)))
+    ;;(message "%c %s %s" plant area perimeter)
+    (list area perimeter)))
+
+(let* ((farm (vconcat (mapcar 'string-to-vector (s-lines (s-trim input)))))
+       (prices)
+       (m (length farm))
+       (n (length (aref farm 0)))
+       (visited (make-vector (* m n) nil)))
+  (dotimes (i m)
+    (dotimes (j n)
+      (when-let ((seed (cons i j))
+                 (v (not (aref visited (+ (* i n) j))))
+                 (price (flood-fill-area-perimeter farm seed))
+                 (plant (aref (aref farm i) j)))
+        ;; make sure to mark all nodes in region as visited to avoid double work
+        (mapc (lambda (node)
+                (aset visited (+ (* (car node) n) (cdr node)) t))
+              (car price))
+        (push (cons plant price) prices))))
+  (apply '+ (mapcar (lambda (p)
+                      (let* ((area (length (cadr p)))
+                             (perimeter (length (caddr p)))
+                             (plant (car p))
+                             (price (* area perimeter)))
+                        ;;(message "%c: [A:%d P:%d] %d" plant area perimeter price)
+                        price))
+                    prices)))
+#+end_src
+
+#+RESULTS:
+: 140
+
+#+call: calculate-price(input=example-12b)
+
+#+RESULTS:
+: 772
+
+
+#+call: calculate-price(input=example-12c)
+
+#+RESULTS:
+: 1930
+
+#+call: calculate-price(input=input-file("input-12.txt"))
+
