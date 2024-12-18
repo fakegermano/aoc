@@ -225,3 +225,267 @@ MMMISSJEEE
 
 #+call: calculate-price(input=input-file("input-12.txt"))
 
+#+name: calculate-price-discount
+#+begin_src elisp :var input=example-12a
+(defun map-as-list (map)
+  "convert map to list with (key value) ordered by key"
+  (let ((list-map))
+    (maphash (lambda (key value)
+               (push (list key value) list-map))
+             map)
+    (cl-sort list-map #'< :key #'car)
+    list-map))
+
+(defun map-coords (coords m n symfull symempty)
+  "map the coordinate list as a matrix filling the i/j
+with symfull at coordinate points and symempty otherwise"
+  (let ((map (make-vector (* m n) symempty)))
+    (mapc (lambda (c)
+            (aset map (+ (* (car c) n) (cdr c)) symfull))
+          coords)
+    (mapconcat #'concat (seq-split map n) "\n")))
+
+(defun compress-car (seq)
+  "compresses a sorted sequence of cons by identifying increasing car values (when cdr is the same)"
+  (let ((compressed))
+    (dolist (c seq)
+      ;; (message "%s %sx%s [%s+1=%s] [%s=%s]" compressed (car compressed) c (car (car compressed)) (car c) (cdr (car compressed)) (cdr c))
+      (cond
+       ((null compressed) nil)
+       ((and (= (cdr (car compressed)) (cdr c))
+             (= (car (car compressed)) (1- (car c))))
+        (pop compressed)))
+       (push c compressed))
+    compressed))
+
+(defun compress-cdr (seq)
+  "compresses a sorted sequence of cons by identifying increasing cdr values (when car is the same)"
+  (let ((compressed))
+    (dolist (c seq)
+      ;; (message "%s %sx%s [%s=%s] [%s+1=%s]" compressed (car compressed) c (car (car compressed)) (car c) (cdr (car compressed)) (cdr c))
+      (cond
+       ((null compressed) nil)
+       ((and (= (car (car compressed)) (car c))
+             (= (cdr (car compressed)) (1- (cdr c))))
+        (pop compressed)))
+      (push c compressed))
+    compressed))
+
+(defun less-car-cdr (u v)
+  "compares if a cons is less then other looking at car first then at cdr"
+  (if (= (car u) (car v))
+      (< (cdr u) (cdr v))
+    (< (car u) (car v))))
+
+(defun less-cdr-car (u v)
+  "compares if a cons is less then other looking at cdr first then at car"
+  (if (= (cdr u) (cdr v))
+      (< (car u) (car v))
+    (< (cdr u) (cdr v))))
+
+(defun flood-fill-area-perimeter (farm seed)
+  "uses flood-fill algorithm to find area and perimeter"
+  (let* ((m (length farm))
+         (n (length (aref farm 0)))
+         (plant (aref (aref farm (car seed)) (cdr seed)))
+         (stack)
+         (area)
+         (perimeter-up)
+         (perimeter-down)
+         (perimeter-left)
+         (perimeter-right)
+         (perimeter)
+         (insidep (lambda (node)
+                    (let ((inside (and (>= (car node) 0)
+                                       (< (car node) m)
+                                       (>= (cdr node) 0)
+                                       (< (cdr node) n)
+                                       (= (aref (aref farm (car node)) (cdr node)) plant))))
+                      inside))))
+    (push seed stack)
+    (while-let ((node (pop stack)))
+      (unless (member node area)
+        (push node area)
+        (mapc (lambda (side)
+                (let ((next (cons (+ (car node) (car side))
+                                  (+ (cdr node) (cdr side)))))
+                  (if (funcall insidep next)
+                      (push next stack)
+                    (pcase side
+                      ('(-1 . 0) (push next perimeter-up))
+                      ('(1 . 0) (push next perimeter-down))
+                      ('(0 . -1) (push next perimeter-left))
+                      ('(0 . 1) (push next perimeter-right))))))
+              '((-1 . 0) (1 . 0) (0 . -1) (0 . 1)))))
+
+    (cl-sort perimeter-up 'less-car-cdr)
+    (cl-sort perimeter-down 'less-car-cdr)
+    (cl-sort perimeter-left 'less-cdr-car)
+    (cl-sort perimeter-right 'less-cdr-car)
+
+    ;; (message "%s\n" (map-coords area m n plant ?.))
+    (setq perimeter (append (compress-cdr perimeter-up)
+                            (compress-cdr perimeter-down)
+                            (compress-car perimeter-left)
+                            (compress-car perimeter-right)))
+    ;; (message "%s\n" (map-coords (mapcar (lambda (c) (cons (1+ (car c)) (1+ (cdr c)))) perimeter) (+ m 2) (+ n 2) ?# ?.))
+    (list area perimeter)))
+
+(let* ((farm (vconcat (mapcar 'string-to-vector (s-lines (s-trim input)))))
+       (prices)
+       (m (length farm))
+       (n (length (aref farm 0)))
+       (visited (make-vector (* m n) nil)))
+  (dotimes (i m)
+    (dotimes (j n)
+      (when-let ((seed (cons i j))
+                 (v (not (aref visited (+ (* i n) j))))
+                 (price (flood-fill-area-perimeter farm seed))
+                 (plant (aref (aref farm i) j)))
+        ;; make sure to mark all nodes in region as visited to avoid double work
+        (mapc (lambda (node)
+                (aset visited (+ (* (car node) n) (cdr node)) t))
+              (car price))
+        (push (cons plant price) prices))))
+  (apply '+ (mapcar (lambda (p)
+                      (let* ((area (length (cadr p)))
+                             (perimeter (length (caddr p)))
+                             (plant (car p))
+                             (price (* area perimeter)))
+                        ;; (message "%c: [A:%d P:%d] %d" plant area perimeter price)
+                        price))
+                    prices)))
+#+end_src
+
+#+RESULTS: calculate-price-discount
+: 80
+
+#+call: calculate-price-discount(input=example-12b)
+
+#+RESULTS:
+: 436
+
+#+name: example-12d
+#+begin_example
+EEEEE
+EXXXX
+EEEEE
+EXXXX
+EEEEE
+#+end_example
+
+
+#+call: calculate-price-discount(input=example-12d)
+
+#+RESULTS:
+: 236
+
+#+name: example-12e
+#+begin_example
+AAAAAA
+AAABBA
+AAABBA
+ABBAAA
+ABBAAA
+AAAAAA
+#+end_example
+
+#+call: calculate-price-discount(input=example-12e)
+
+#+RESULTS:
+: 368
+
+#+call: calculate-price-discount(input=input-file("input-12.txt"))
+
+#+RESULTS:
+: 844132
+
+* Day 13
+
+#+name: example-13a
+#+begin_example
+Button A: X+94, Y+34
+Button B: X+22, Y+67
+Prize: X=8400, Y=5400
+
+Button A: X+26, Y+66
+Button B: X+67, Y+21
+Prize: X=12748, Y=12176
+
+Button A: X+17, Y+86
+Button B: X+84, Y+37
+Prize: X=7870, Y=6450
+
+Button A: X+69, Y+23
+Button B: X+27, Y+71
+Prize: X=18641, Y=10279
+#+end_example
+
+#+name: fewest-tokens
+#+begin_src elisp :var input=example-13a
+(defun solve (machine)
+  (let* ((A (car machine))
+         (B (cadr machine))
+         (P (caddr machine))
+         (Ax (car A))
+         (Ay (cdr A))
+         (Bx (car B))
+         (By (cdr B))
+         (X (car P))
+         (Y (cdr P))
+         (b (/ (- (* Y Ax) (* X Ay)) (- (* Ax By) (* Ay Bx))))
+         (a (/ (- X (* b Bx)) Ax)))
+    (message "a: %d b: %d" a b)
+    (when (and (= (+ (* a Ax) (* b Bx)) X)
+               (= (+ (* a Ay) (* b By)) Y))
+      (message "\twinnable!")
+      (+ (* a 3) b))))
+
+(let ((machines (mapcar (lambda (l)
+                          (mapcar (lambda (g) (cons (string-to-number (car g)) (string-to-number (cadr g))))
+                                  (list (cdr (s-match (rx "Button A: X+" (group (+ num)) ", Y+" (group (+ num))) (car l)))
+                                        (cdr (s-match (rx "Button B: X+" (group (+ num)) ", Y+" (group (+ num))) (cadr l)))
+                                        (cdr (s-match (rx "Prize: X=" (group (+ num)) ", Y=" (group (+ num))) (caddr l))))))
+                        (mapcar 'butlast (seq-split (s-lines input) 4)))))
+  (apply #'+ (seq-filter #'identity (mapcar 'solve machines))))
+#+end_src
+
+#+RESULTS:
+: 480
+
+#+call: fewest-tokens(input=input-file("input-13.txt"))
+
+#+name: fewest-tokens-corrected
+#+begin_src elisp :var input=example-13a
+(defun solve (machine)
+  (let* ((A (car machine))
+         (B (cadr machine))
+         (P (caddr machine))
+         (Ax (car A))
+         (Ay (cdr A))
+         (Bx (car B))
+         (By (cdr B))
+         (X (+ (car P) 10000000000000))
+         (Y (+ (cdr P) 10000000000000))
+         (b (/ (- (* Y Ax) (* X Ay)) (- (* Ax By) (* Ay Bx))))
+         (a (/ (- X (* b Bx)) Ax)))
+    (message "a: %d b: %d" a b)
+    (when (and (= (+ (* a Ax) (* b Bx)) X)
+               (= (+ (* a Ay) (* b By)) Y))
+      (message "\twinnable!")
+      (+ (* a 3) b))))
+
+(let ((machines (mapcar (lambda (l)
+                          (mapcar (lambda (g) (cons (string-to-number (car g)) (string-to-number (cadr g))))
+                                  (list (cdr (s-match (rx "Button A: X+" (group (+ num)) ", Y+" (group (+ num))) (car l)))
+                                        (cdr (s-match (rx "Button B: X+" (group (+ num)) ", Y+" (group (+ num))) (cadr l)))
+                                        (cdr (s-match (rx "Prize: X=" (group (+ num)) ", Y=" (group (+ num))) (caddr l))))))
+                        (mapcar 'butlast (seq-split (s-lines input) 4)))))
+  (apply #'+ (seq-filter #'identity (mapcar 'solve machines))))
+#+end_src
+
+#+RESULTS: fewest-tokens-corrected
+: 875318608908
+
+#+call: fewest-tokens-corrected(input=input-file("input-13.txt"))
+
