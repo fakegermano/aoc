@@ -5,7 +5,6 @@
 (f-read fname)
 #+end_src
 
-
 * Day 11
 
 #+name: example-11a
@@ -400,6 +399,7 @@ AAAAAA
 #+RESULTS:
 : 844132
 
+
 * Day 13
 
 #+name: example-13a
@@ -489,3 +489,439 @@ Prize: X=18641, Y=10279
 
 #+call: fewest-tokens-corrected(input=input-file("input-13.txt"))
 
+
+
+* Day 14
+#+name: example-14a
+#+begin_example
+p=0,4 v=3,-3
+p=6,3 v=-1,-3
+p=10,3 v=-1,2
+p=2,0 v=2,-1
+p=0,0 v=1,3
+p=3,0 v=-2,-2
+p=7,6 v=-1,-3
+p=3,0 v=-1,-2
+p=9,3 v=2,3
+p=7,3 v=-1,2
+p=2,4 v=2,-3
+p=9,5 v=-3,-3
+#+end_example
+
+#+name: example-14b
+#+begin_example
+p=2,4 v=2,-3
+#+end_example
+
+
+#+name: robot-positions
+#+begin_src elisp :var input=example-14a :var n=11 :var m=7 :var seconds=100
+(defun print-positions (positions)
+  "print positions in a map that is nxm"
+  (let ((map (make-vector (* m n) nil)))
+    (mapc (lambda (p)
+            (let* ((pos (+ (* (cadr p) n) (car p)))
+                   (curr (aref map pos)))
+              (if curr
+                  (aset map pos (1+ curr))
+                (aset map pos 1))))
+          positions)
+    (mapconcat #'identity (mapcar (lambda (line) (mapconcat (lambda (p) (if p
+                                                                            (number-to-string p)
+                                                                          "."))
+                                                            line ""))
+                                  (seq-split map n))
+               "\n")))
+
+(defun get-quadrant (positions x y)
+  "from list of positions make return only the ones on the quadrant (x1 to x2) and (y1 to y2)"
+  (let ((quadrant))
+    (mapc (lambda (p)
+            (when (and (<= (car x) (car p) (cdr x))
+                       (<= (car y) (cadr p) (cdr y)))
+              (push p quadrant)))
+          positions)
+    quadrant))
+
+(let* ((parsed (mapcar (lambda (l) (mapcar (lambda (v)
+                                             (mapcar 'string-to-number
+                                                     (s-split "," (cadr (s-split "=" v)))))
+                                           (s-split " " l)))
+                       (s-lines (s-trim input))))
+       (final-positions (mapcar (lambda (robot)
+                                  (let* ((p (car robot))
+                                         (v (cadr robot))
+                                         (x-after (% (+ (car p) (* (car v) seconds)) n))
+                                         (y-after (% (+ (cadr p) (* (cadr v) seconds)) m)))
+                                    (when (< x-after 0)
+                                      (setq x-after (+ x-after n)))
+                                    (when (< y-after 0)
+                                      (setq y-after (+ y-after m)))
+                                    (list x-after y-after)))
+                                parsed))
+       (q1 (get-quadrant final-positions (cons 0 (1- (/ n 2))) (cons 0 (1- (/ m 2)))))
+       (q2 (get-quadrant final-positions (cons 0 (1- (/ n 2))) (cons (1+ (/ m 2)) m)))
+       (q3 (get-quadrant final-positions (cons (1+ (/ n 2)) n) (cons 0 (1- (/ m 2)))))
+       (q4 (get-quadrant final-positions (cons (1+ (/ n 2)) n) (cons (1+ (/ m 2)) m))))
+  (message "initial:\n%s\n" (print-positions (mapcar 'car parsed)))
+  (message "final:\n%s\n" (print-positions final-positions))
+  (* (length q1) (length q2) (length q3) (length q4)))
+#+end_src
+
+#+RESULTS: robot-positions
+: 12
+
+#+call: robot-positions(input=example-14b,seconds=5)
+
+#+RESULTS:
+: 0
+
+#+call:robot-positions(input=input-file("input-14.txt"),seconds=100,n=101,m=103)
+
+#+RESULTS:
+: 224554908
+
+#+name: robot-easter-egg-hunt
+#+begin_src elisp :var input=example-14a :var n=11 :var m=7 :var seconds=100
+(defun print-positions (positions)
+  "print positions in a map that is nxm"
+  (let ((map (make-vector (* m n) nil)))
+    (mapc (lambda (p)
+            (let* ((pos (+ (* (cadr p) n) (car p)))
+                   (curr (aref map pos)))
+              (if curr
+                  (aset map pos (1+ curr))
+                (aset map pos 1))))
+          positions)
+    (mapconcat #'identity (mapcar (lambda (line) (mapconcat (lambda (p) (if p
+                                                                            (number-to-string p)
+                                                                          "."))
+                                                            line ""))
+                                  (seq-split map n))
+               "\n")))
+
+(let* ((parsed (mapcar (lambda (l) (mapcar (lambda (v)
+                                             (mapcar 'string-to-number
+                                                     (s-split "," (cadr (s-split "=" v)))))
+                                           (s-split " " l)))
+                       (s-lines (s-trim input))))
+       (next parsed)
+       (possible-tree)
+       (i 0)
+       (min-entropy '(-1 . 1.0)))
+
+  ;;(message "initial:\n%s\n" (print-positions (mapcar 'car parsed)))
+  (while (null possible-tree)
+    (setq i (1+ i))
+    (setq next (mapcar (lambda (robot)
+                         (let* ((p (car robot))
+                                (v (cadr robot))
+                                (x-after (% (+ (car p) (* (car v) 1)) n))
+                                (y-after (% (+ (cadr p) (* (cadr v) 1)) m)))
+                           (when (< x-after 0)
+                             (setq x-after (+ x-after n)))
+                           (when (< y-after 0)
+                             (setq y-after (+ y-after m)))
+                           (list (list x-after y-after) v)))
+                       next))
+        (when (= (length next) (length (seq-uniq (mapcar (lambda (p) (+ (* (cadr p) n) (car p))) (mapcar 'car next)))))
+      (setq min-entropy i)
+      (setq possible-tree (mapcar 'car next))))
+  (message "tree:\n%s\n" (print-positions possible-tree))
+  min-entropy)
+#+end_src
+
+#+RESULTS: robot-easter-egg-hunt
+: 0
+
+#+call: robot-easter-egg-hunt(input=input-file("input-14.txt"),n=101,m=103)
+
+#+RESULTS:
+: 6643
+
+
+* Day 15
+
+#+name: example-15a
+#+begin_example
+##########
+#..O..O.O#
+#......O.#
+#.OO..O.O#
+#..O@..O.#
+#O#..O...#
+#O..O..O.#
+#.OO.O.OO#
+#....O...#
+##########
+
+<vv>^<v^>v>^vv^v>v<>v^v<v<^vv<<<^><<><>>v<vvv<>^v^>^<<<><<v<<<v^vv^v>^
+vvv<<^>^v^^><<>>><>^<<><^vv^^<>vvv<>><^^v>^>vv<>v<<<<v<^v>^<^^>>>^<v<v
+><>vv>v^v^<>><>>>><^^>vv>v<^^^>>v^v^<^^>v^^>v^<^v>v<>>v^v^<v>v^^<^^vv<
+<<v<^>>^^^^>>>v^<>vvv^><v<<<>^^^vv^<vvv>^>v<^^^^v<>^>vvvv><>>v^<<^^^^^
+^><^><>>><>^^<<^^v>>><^<v>^<vv>>v>>>^v><>^v><<<<v>>v<v<v>vvv>^<><<>^><
+^>><>^v<><^vvv<^^<><v<<<<<><^v<<<><<<^^<v<^^^><^>>^<v^><<<^>>^v<v^v<v^
+>^>>^v>vv>^<<^v<>><<><<v<<v><>v<^vv<<<>^^v^>^^>>><<^v>>v^v><^^>>^<>vv^
+<><^^>^^^<><vvvvv^v<v<<>^v<v>v<<^><<><<><<<^^<<<^<<>><<><^^^>^^<>^>v<>
+^^>vv<^v^v<vv>^<><v<^v>^^^>>>^^vvv^>vvv<>>>^<^>>>>>^<<^v>^vvv<>^<><<v>
+v^^>>><<^^<>>^v^<v^vv<>v^<<>^<^v^v><^<<<><<^<v><v<>vv>>v><v^<vv<>v^<<^
+#+end_example
+
+#+name: example-15b
+#+begin_example
+########
+#..O.O.#
+##@.O..#
+#...O..#
+#.#.O..#
+#...O..#
+#......#
+########
+
+<^^>>>vv<v>>v<<
+#+end_example
+
+#+name: move-push-and-gps
+#+begin_src elisp :var input=example-15b
+(defun print-map (map m n)
+  "prints the map as matrix"
+  (mapconcat 'identity (mapcar 'concat (seq-split map n)) "\n"))
+
+(defun move-and-push (d map p m n)
+  "return the new position after moving in the direction
+pushes all boxes that can be pushed if any"
+  (let ((move)
+        (la 0)
+        (boxes))
+    (pcase d
+      (?^
+       (setq move (* -1 n)))
+      (?v
+       (setq move n))
+      (?<
+       (setq move -1))
+      (?>
+       (setq move 1)))
+    (setq la (+ p move))
+    (pcase (aref map la)
+     (?# p)
+     (?O
+      (push la boxes)
+      (setq la (+ la move))
+      (while (= (aref map la) ?O)
+        (push la boxes)
+        (setq la (+ la move)))
+      (if (= (aref map la) ?.)
+           (progn
+             (while-let ((box (pop boxes)))
+               (aset map box ?.)
+               (aset map la ?O)
+               (setq la box))
+             la)
+         p))
+     (?. la))))
+
+(let* ((parsed (s-split "||" (s-replace "\n" "|" (s-trim input))))
+       (map (vconcat (mapcar 'string-to-vector (s-split "|" (car parsed)))))
+       (m (length map))
+       (n (length (aref map 0)))
+       (flatmap (string-to-vector (mapconcat #'identity map "")))
+       (pos (seq-position flatmap ?@))
+       (movements (string-to-list (s-replace "|" "" (cadr parsed)))))
+  (while-let ((dir (pop movements)))
+    (aset flatmap pos ?.)
+    (setq pos (move-and-push dir flatmap pos m n))
+    (aset flatmap pos ?@))
+  (message "%s" (print-map flatmap m n))
+  (apply #'+ (mapcar (lambda (p) (+ (* (/ p n) 100) (% p n)))
+                     (seq-positions flatmap ?O))))
+#+end_src
+
+#+RESULTS: move-push-and-gps
+: 2028
+
+#+call: move-push-and-gps(input=example-15a)
+
+#+RESULTS:
+: 10092
+
+#+call: move-push-and-gps(input=input-file("input-15.txt"))
+
+#+name: example-15c
+#+begin_example
+#######
+#...#.#
+#.....#
+#..OO@#
+#..O..#
+#.....#
+#######
+
+<vv<<^^<<^^
+#+end_example
+
+
+#+name: move-push-and-gps-wide
+#+begin_src elisp :var input=example-15c
+(defun print-wide-map (map m n)
+  "prints the map as matrix"
+  (mapconcat 'identity (mapcar 'concat (seq-split map n)) "\n"))
+
+(defun push-horizontal (map move p)
+  "push boxes horizontally following move"
+  (let ((la (+ p move))
+        (boxes))
+    (pcase (aref map la)
+      (?. la)
+      (?# p)
+      (_
+       (push la boxes)
+       (setq la (+ p move))
+       (while (or (= (aref map la) ?\[)
+                  (= (aref map la) ?\]))
+         (push la boxes)
+         (setq la (+ la move)))
+
+       (if (= (aref map la) ?.)
+           (progn
+             (while-let ((box (pop boxes)))
+               (aset map la (aref map box))
+               (aset map box ?.)
+               (setq la box))
+             la)
+         p)))))
+
+(defun push-vertical (map move p)
+  "push boxes vertically following move"
+  (let ((la)
+        (boxes))
+    (pcase (aref map (+ p move))
+      (?. (+ p move))
+      (?# p)
+      (_
+       (when (= (aref map (+ p move)) ?\[)
+         (push (cons (+ p move) (+ p move 1)) la))
+       (when (= (aref map (+ p move)) ?\])
+         (push (cons (+ p move -1) (+ p move)) la))
+
+       (while-let ((boxla (pop la))
+                   (lla (aref map (car boxla)))
+                   (rla (aref map (cdr boxla))))
+         (cond
+          ((and (= lla ?\[) (= rla ?\]))
+           (unless (member boxla boxes)
+             (push (cons (+ (car boxla) move) (+ (cdr boxla) move)) la)
+             (push boxla boxes)))
+          ((or (= lla ?\]) (= rla ?\[))
+           (when (= lla ?\])
+             (unless (member (cons (1- (car boxla)) (car boxla)) boxes)
+               (push (cons (+ (car boxla) move -1) (+ (car boxla) move)) la)
+               (push (cons (1- (car boxla)) (car boxla)) boxes)))
+           (when (= rla ?\[)
+             (unless (member (cons (cdr boxla) (1+ (cdr boxla))) boxes)
+               (push (cons (+ (cdr boxla) move) (+ (cdr boxla) move 1)) la)
+               (push (cons (cdr boxla) (1+ (cdr boxla))) boxes))))))
+
+       (mapc (lambda (b)
+               (push (+ (car b) move) la)
+               (push (+ (cdr b) move) la))
+             boxes)
+       (if (seq-every-p (lambda (c) (not (= (aref map c) ?#))) la)
+           (progn
+             (if (< move 0)
+                 ;; sort smalest first
+                 (cl-sort boxes #'< :key #'car)
+               ;; sort largest first
+               (cl-sort boxes #'> :key #'car))
+             (while-let ((box (pop boxes))
+                         (current (cons (aref map (car box)) (aref map (cdr box))))
+                         (ahead (cons (aref map (+ (car box) move)) (aref map (+ (cdr box) move)))))
+               (aset map (+ (car box) move) (car current))
+               (aset map (+ (cdr box) move) (cdr current))
+               (aset map (car box) (car ahead))
+               (aset map (cdr box) (cdr ahead)))
+             (+ p move))
+         p)
+       ))))
+
+(defun move-and-push-wide (d map p m n)
+  "return the new position after moving in the direction
+pushes all boxes that can be pushed if any"
+  (pcase d
+    (?^
+     (push-vertical map (* -1 n) p))
+    (?v
+     (push-vertical map n p))
+    (?<
+     (push-horizontal map -1 p))
+    (?>
+     (push-horizontal map 1 p))))
+
+(let* ((parsed (s-split "||" (s-replace "\n" "|" (s-trim input))))
+       (map (vconcat (mapcar (lambda (s) (string-to-vector (s-replace-all
+                                                            '(("#" . "##")
+                                                              ("O" . "[]")
+                                                              ("." . "..")
+                                                              ("@" . "@."))
+                                                            s)))
+                             (s-split "|" (car parsed)))))
+       (m (length map))
+       (n (length (aref map 0)))
+       (flatmap (string-to-vector (mapconcat #'identity map "")))
+       (pos (cl-position ?@ flatmap))
+       (movements (string-to-list (s-replace "|" "" (cadr parsed)))))
+
+  ;; (with-output-to-temp-buffer "*move-push-wide*"
+  ;;   (print! "%s\n" (print-wide-map flatmap m n))
+    (while-let ((dir (pop movements)))
+      (aset flatmap pos ?.)
+      (setq pos (move-and-push-wide dir flatmap pos m n))
+      (aset flatmap pos ?@)
+
+      ;; (print! "%c\n%s\n" dir (print-wide-map flatmap m n)))
+    )
+
+    (message "%s" (print-wide-map flatmap m n))
+    (apply #'+ (mapcar (lambda (p) (+ (* (/ p n) 100) (% p n)))
+                       (seq-positions flatmap ?\[)))
+  )
+#+end_src
+
+#+RESULTS: move-push-and-gps-wide
+: 618
+
+#+call: move-push-and-gps-wide(input=example-15a)
+
+#+RESULTS:
+: 9021
+
+#+call: move-push-and-gps-wide(input=example-15b)
+
+#+RESULTS:
+: 1751
+
+#+name: example-15d
+#+begin_example
+#########
+#.OOOO..#
+#.O....O#
+#..O.OO.#
+#@OO..O.#
+#..OO..O#
+#O.OO...#
+#..OO..##
+#..O..O.#
+#.......#
+#.......#
+#########
+
+>>vvvv>>v>>>>^^^^^<^^<<v
+#+end_example
+
+#+call: move-push-and-gps-wide(input=example-15d)
+
+#+RESULTS:
+: 10375
+
+
+#+call: move-push-and-gps-wide(input=input-file("input-15.txt"))
