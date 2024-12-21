@@ -925,3 +925,395 @@ pushes all boxes that can be pushed if any"
 
 
 #+call: move-push-and-gps-wide(input=input-file("input-15.txt"))
+
+
+* Day 16
+
+#+name: example-16a
+#+begin_example
+###############
+#.......#....E#
+#.#.###.#.###.#
+#.....#.#...#.#
+#.###.#####.#.#
+#.#.#.......#.#
+#.#.#####.###.#
+#...........#.#
+###.#.#####.#.#
+#...#.....#.#.#
+#.#.#.###.#.#.#
+#.....#...#.#.#
+#.###.#.#.#.#.#
+#S..#.....#...#
+###############
+#+end_example
+
+#+name: example-16b
+#+begin_example
+#################
+#...#...#...#..E#
+#.#.#.#.#.#.#.#.#
+#.#.#.#...#...#.#
+#.#.#.#.###.#.#.#
+#...#.#.#.....#.#
+#.#.#.#.#.#####.#
+#.#...#.#.#.....#
+#.#.#####.#.###.#
+#.#.#.......#...#
+#.#.###.#####.###
+#.#.#...#.....#.#
+#.#.#.#####.###.#
+#.#.#.........#.#
+#.#.#.#########.#
+#S#.............#
+#################
+#+end_example
+
+#+name: reindeer-maze-score
+#+begin_src elisp :var input=example-16a
+(defun print-map (map n)
+  "prints the map as matrix"
+  (mapconcat 'identity (mapcar 'concat (seq-split map n)) "\n"))
+
+(let* ((map (vconcat (mapcar 'string-to-vector (s-lines (s-trim input)))))
+       (n (length (aref map 0)))
+       (flatmap (string-to-vector (mapconcat #'identity map "")))
+       (source (cl-position ?S flatmap))
+       (dest (cl-position ?E flatmap))
+       (pqueue)
+       (moves (list (* -1 n) -1 n 1)) ;; up, left, down and right
+       (g-scores (make-vector (* (length flatmap) 4) nil))
+       ;; (f-scores (make-vector (length flatmap) nil))
+       (previous (make-vector (* (length flatmap) 4) nil))
+       ;; visited needs to consider the directions
+       (visited (make-vector (* (length flatmap) 4) nil)))
+
+  (aset g-scores (+ (* source 4) 3) 0)
+
+  ;;(message "%s\n" (print-map flatmap n))
+  (push (+ (* source 4) 3) pqueue)
+
+  (while-let ((nodeposdir (pop pqueue))
+              (pos (/ nodeposdir 4))
+              (dir (% nodeposdir 4))
+              (move (nth dir moves))
+              (_ (not (= pos dest))))
+    (aset visited nodeposdir t)
+
+    ;; forward
+    (when-let ((neigh (+ pos move))
+               (neighposdir (+ (* neigh 4) dir))
+               (notwall (not (= (aref flatmap neigh) ?#)))
+               (notvisited (null (aref visited neighposdir))))
+
+      (unless (memq neighposdir pqueue)
+        (push neighposdir pqueue))
+
+      (when-let ((tg-score (+ (aref g-scores nodeposdir) 1))
+                 (_ (or (null (aref g-scores neighposdir)) ;; nil g-score -> infinite
+                        (<= tg-score (aref g-scores neighposdir)))))
+        (aset previous neighposdir nodeposdir)
+        (aset g-scores neighposdir tg-score)))
+
+    ;; turn left
+    (when-let ((ndir (% (1+ dir) 4))
+               (neigh (+ pos (nth ndir moves)))
+               (neighposdir (+ (* neigh 4) ndir))
+               (notwall (not (= (aref flatmap neigh) ?#)))
+               (notvisited (null (aref visited neighposdir))))
+      (unless (memq neighposdir pqueue)
+        (push neighposdir pqueue))
+
+      (when-let ((tg-score (+ (aref g-scores nodeposdir) 1001))
+                 (_ (or (null (aref g-scores neighposdir)) ;; nil g-score -> infinite
+                        (<= tg-score (aref g-scores neighposdir)))))
+        (aset previous neighposdir nodeposdir)
+        (aset g-scores neighposdir tg-score))
+      )
+
+    ;; turn right
+    (when-let ((ndir (if (< (% (1- dir) 4) 0)
+                         (+ 4 (% (1- dir) 4))
+                       (% (1- dir) 4)))
+               (neigh (+ pos (nth ndir moves)))
+               (neighposdir (+ (* neigh 4) ndir))
+               (notwall (not (= (aref flatmap neigh) ?#)))
+               (notvisited (null (aref visited neighposdir))))
+      (unless (memq neighposdir pqueue)
+        (push neighposdir pqueue))
+
+      (when-let ((tg-score (+ (aref g-scores nodeposdir) 1001))
+                 (_ (or (null (aref g-scores neighposdir)) ;; nil g-score -> infinite
+                        (<= tg-score (aref g-scores neighposdir)))))
+        (aset previous neighposdir nodeposdir)
+        (aset g-scores neighposdir tg-score))
+      )
+    ;; sort queue according with lowest g-score first
+    (cl-sort pqueue (lambda (u v) (< (aref g-scores u)
+                                     (aref g-scores v))))
+    ;; (message "%s" (mapcar (lambda (p) (list (cons (/ (/ p 4) n) (% (/ p 4) n))
+    ;;                                         (nth (% p 4) moves)
+    ;;                                         (aref g-scores p)))
+    ;;                       pqueue))
+    )
+
+  ;; helper to visualize map
+  (let* ((destscores (mapcar (lambda (dir) (or (aref g-scores (+ (* dest 4) dir))
+                                               most-positive-fixnum))
+                             (number-sequence 0 3)))
+         (score (seq-min destscores))
+         (dir (cl-position score destscores))
+         (pos (aref previous (+ (* dest 4) dir))))
+    (while (not (= pos (+ (* source 4) 3)))
+      (setq dir (% pos 4))
+      (cond
+       ;; up
+       ((= dir 0) (aset flatmap (/ pos 4) ?^))
+       ((= dir 1) (aset flatmap (/ pos 4) ?<))
+       ((= dir 2) (aset flatmap (/ pos 4) ?v))
+       (t (aset flatmap (/ pos 4) ?>)))
+      (setq pos (aref previous pos)))
+
+    (message "%s\n" (print-map flatmap n))
+    score))
+#+end_src
+
+#+RESULTS: reindeer-maze-score
+: 7036
+
+#+call: reindeer-maze-score(input=example-16b)
+
+#+RESULTS:
+: 11048
+
+#+name: example-16c
+#+begin_example
+###############
+#.#.#...#.#...#
+#.#.#.#####.#.#
+#.#...#.....#.#
+#######.#####.#
+#.#.....#...#.#
+#E#.#####.#.#.#
+#.....#...#...#
+#####.#.#.#.#.#
+#...#.#.#...#.#
+#.#.#.#.#.#.#.#
+#.#.#...#.....#
+###.#.###.#.#.#
+#.......##.#S.#
+###############
+#+end_example
+
+#+call: reindeer-maze-score(input=example-16c)
+
+#+RESULTS:
+: 9028
+
+#+call: reindeer-maze-score(input=input-file("input-16.txt"))
+
+#+name: reindeer-maze-count-paths
+#+begin_src elisp :var input=example-16a
+(defun print-map (map n)
+  "prints the map as matrix"
+  (mapconcat 'identity (mapcar 'concat (seq-split map n)) "\n"))
+
+(let* ((map (vconcat (mapcar 'string-to-vector (s-lines (s-trim input)))))
+       (n (length (aref map 0)))
+       (flatmap (string-to-vector (mapconcat #'identity map "")))
+       (source (cl-position ?S flatmap))
+       (dest (cl-position ?E flatmap))
+       (pqueue)
+       (moves (list (* -1 n) -1 n 1)) ;; up, left, down and right
+       (g-scores (make-vector (* (length flatmap) 4) nil))
+       ;; (f-scores (make-vector (length flatmap) nil))
+       (previous (make-vector (* (length flatmap) 4) nil))
+       ;; visited needs to consider the directions
+       (visited (make-vector (* (length flatmap) 4) nil)))
+
+  (aset g-scores (+ (* source 4) 3) 0)
+
+  ;;(message "%s\n" (print-map flatmap n))
+  (push (+ (* source 4) 3) pqueue)
+
+  (while-let ((nodeposdir (pop pqueue))
+              (pos (/ nodeposdir 4))
+              (dir (% nodeposdir 4))
+              (move (nth dir moves))
+              (_ (not (= pos dest))))
+    (aset visited nodeposdir t)
+
+    ;; forward
+    (when-let ((neigh (+ pos move))
+               (neighposdir (+ (* neigh 4) dir))
+               (notwall (not (= (aref flatmap neigh) ?#)))
+               (notvisited (null (aref visited neighposdir))))
+
+      (unless (memq neighposdir pqueue)
+        (push neighposdir pqueue))
+
+      (when-let ((tg-score (+ (aref g-scores nodeposdir) 1))
+                 (neighscore (or (aref g-scores neighposdir)
+                                 most-positive-fixnum))
+                 (_ (<= tg-score neighscore)))
+        (when (< tg-score neighscore)
+          (aset previous neighposdir (list nodeposdir)))
+        (when (= tg-score neighscore)
+          (unless (memq nodeposdir (aref previous neighposdir))
+            (aset previous neighposdir (cons nodeposdir (aref previous neighposdir)))))
+        (aset g-scores neighposdir tg-score)))
+
+    ;; turn left
+    (when-let ((ndir (% (1+ dir) 4))
+               (neigh (+ pos (nth ndir moves)))
+               (neighposdir (+ (* neigh 4) ndir))
+               (notwall (not (= (aref flatmap neigh) ?#)))
+               (notvisited (null (aref visited neighposdir))))
+      (unless (memq neighposdir pqueue)
+        (push neighposdir pqueue))
+
+      (when-let ((tg-score (+ (aref g-scores nodeposdir) 1001))
+                 (neighscore (or (aref g-scores neighposdir)
+                                 most-positive-fixnum))
+                 (_ (<= tg-score neighscore)))
+        (when (< tg-score neighscore)
+          (aset previous neighposdir (list nodeposdir)))
+        (when (= tg-score neighscore)
+          (unless (memq nodeposdir (aref previous neighposdir))
+            (aset previous neighposdir (cons nodeposdir (aref previous neighposdir)))))
+        (aset g-scores neighposdir tg-score))
+      )
+
+    ;; turn right
+    (when-let ((ndir (if (< (% (1- dir) 4) 0)
+                         (+ 4 (% (1- dir) 4))
+                       (% (1- dir) 4)))
+               (neigh (+ pos (nth ndir moves)))
+               (neighposdir (+ (* neigh 4) ndir))
+               (notwall (not (= (aref flatmap neigh) ?#)))
+               (notvisited (null (aref visited neighposdir))))
+      (unless (memq neighposdir pqueue)
+        (push neighposdir pqueue))
+
+      (when-let ((tg-score (+ (aref g-scores nodeposdir) 1001))
+                 (neighscore (or (aref g-scores neighposdir)
+                                 most-positive-fixnum))
+                 (_ (<= tg-score neighscore)))
+        (when (< tg-score neighscore)
+          (aset previous neighposdir (list nodeposdir)))
+        (when (= tg-score neighscore)
+          (unless (memq nodeposdir (aref previous neighposdir))
+            (aset previous neighposdir (cons nodeposdir (aref previous neighposdir)))))
+        (aset g-scores neighposdir tg-score))
+      )
+    ;; sort queue according with lowest g-score first
+    (cl-sort pqueue (lambda (u v) (< (aref g-scores u)
+                                     (aref g-scores v))))
+    ;; (message "%s" (mapcar (lambda (p) (list (cons (/ (/ p 4) n) (% (/ p 4) n))
+    ;;                                         (nth (% p 4) moves)
+    ;;                                         (aref g-scores p)))
+    ;;                       pqueue))
+    )
+
+  ;; helper to visualize map
+  (let* ((stack)
+         (scores (list (or (aref g-scores (* dest 4))
+                           most-positive-fixnum)
+                       (or (aref g-scores (+ (* dest 4) 1))
+                           most-positive-fixnum)
+                       (or (aref g-scores (+ (* dest 4) 2))
+                           most-positive-fixnum)
+                       (or (aref g-scores (+ (* dest 4) 3))
+                           most-positive-fixnum)))
+         (score (seq-min scores))
+         (dir (cl-position score scores))
+         (path))
+    (mapc (lambda (p) (push p stack))
+          (aref previous (+ (* dest 4) dir)))
+    (push dest path)
+    (while-let ((prev (pop stack))
+                (pos (/ prev 4))
+                (dir (% prev 4)))
+      (unless (memq pos path)
+        ;; (message "%s %d %d" (cons (/ pos n) (% pos n)) dir (aref g-scores prev))
+        (push pos path))
+      (cond
+       ((= dir 0) (aset flatmap pos ?^))
+       ((= dir 1) (aset flatmap pos ?<))
+       ((= dir 2) (aset flatmap pos ?v))
+       (t (aset flatmap pos ?>)))
+
+      (mapc (lambda (p) (push p stack))
+            (aref previous prev)))
+
+    ;; (message "%s\n" (print-map flatmap n))
+    ;; (message "%s" (mapcar (lambda (p) (cons (/ p n) (% p n))) path))
+    (length path)))
+#+end_src
+
+#+RESULTS: reindeer-maze-count-paths
+: 45
+
+#+call: reindeer-maze-count-paths(input=example-16b)
+
+#+RESULTS:
+: 64
+
+
+#+call: reindeer-maze-count-paths(input=example-16c)
+
+#+RESULTS:
+: 29
+
+#+call: reindeer-maze-count-paths(input=input-file("input-16.txt"))
+
+#+RESULTS:
+: 449
+
+
+* Day 17
+
+#+name: example-17a
+#+begin_example
+Register A: 729
+Register B: 0
+Register C: 0
+
+Program: 0,1,5,4,3,0
+#+end_example
+
+#+begin_src elisp :var input=example-17a
+(defun combo-op (op reg-a reg-b reg-c)
+  "returns the combo operator value of op"
+  (pcase (string-to-number op)
+    ((pred (< 4)) op)
+    ((pred (= 4)) reg-a)
+    ((pred (= 5)) reg-b)
+    ((pred (= 6)) reg-c)
+    (_ nil)))
+
+(let* ((parsed (mapcar (lambda (s) (s-split "," (car (reverse (s-split " " s))))) (s-lines (s-replace "\n\n" "\n" (s-trim input)))))
+       (reg-a (string-to-number (caar parsed)))
+       (reg-b (string-to-number (caadr parsed)))
+       (reg-c (string-to-number (caaddr parsed)))
+       (program (vconcat (mapcar 'vconcat (seq-split (cadddr parsed) 2))))
+       (ic 0))
+  (while (< ic (length program))
+    (pcase (aref (aref program ic) 0)
+      ("0"
+       (message "adv (ash A << op)")
+       (setq reg-a (ash reg-a (combo-op (aref (aref program ic) 1) reg-a reg-b reg-c))))
+      ("1" (message "bxl"))
+      ("2" (message "bst"))
+      ("3" (message "jnz"))
+      ("4" (message "bxc"))
+      ("5" (message "out"))
+      ("6" (message "bdv"))
+      ("7" (message "cdv")))
+    (setq ic (1+ ic))
+    )
+  (message "%d %d %d %s" reg-a reg-b reg-c program))
+#+end_src
+
+#+RESULTS:
+: 729 0 0 [[0 1] [5 4] [3 0]]
