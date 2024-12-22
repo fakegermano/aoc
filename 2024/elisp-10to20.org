@@ -1546,42 +1546,20 @@ assumes as are ordered"
           '((-1 . 0) (1 . 0) (0 . -1) (0 . 1)))
     neighs))
 
-(defun dijkstra-reachable-p (map source sink n)
-  "return non-nill if dijkstra on map from source to sink reaches"
+(defun reachable-p (map source sink n)
+  "return non-nill if dfs on map from source to sink reaches"
   (let* ((visited (make-vector (* n n) nil))
-         (costs (make-vector (* n n) nil))
-         (previous (make-vector (* n n) nil))
          (pqueue))
-    (aset costs source 0)
     (push source pqueue)
 
-    (while-let ((node (pop pqueue))
-                (_ (not (= node sink))))
+    (while-let ((node (pop pqueue)))
       (aset visited node t)
       (mapc (lambda (neigh)
-              (when-let ((cost (+ (aref costs node) 1))
-                         (_ (<= cost (or (aref costs neigh)
-                                         most-positive-fixnum))))
-                (aset previous neigh node)
-                (aset costs neigh cost)
-                (unless (memq neigh pqueue)
-                  (push neigh pqueue))))
-            (neighbors node flatmap visited n))
+              (unless (memq neigh pqueue)
+                (push neigh pqueue)))
+            (neighbors node flatmap visited n)))
 
-      (cl-sort pqueue (lambda (u v) (< (or (aref costs u)
-                                           most-positive-fixnum)
-                                       (or (aref costs v)
-                                           most-positive-fixnum)))))
-    (let ((pos sink)
-          (path))
-
-      (while-let ((prev (aref previous pos))
-                  (_ (not (= pos source))))
-        (push pos path)
-        (setq pos prev))
-      ;; (message "%s" path))
-      )
-    (aref previous sink)))
+    (aref visited sink)))
 
 
 (let* ((parsed (vconcat (mapcar (lambda (l) (vconcat (reverse (mapcar 'string-to-number
@@ -1598,7 +1576,7 @@ assumes as are ordered"
              (aref (aref parsed b) 1))
           ?#))
 
-  (while (and (dijkstra-reachable-p flatmap source sink n)
+  (while (and (reachable-p flatmap source sink n)
               (< bytes (length parsed)))
     (setq bytes (1+ bytes))
     (when (< bytes (length parsed))
