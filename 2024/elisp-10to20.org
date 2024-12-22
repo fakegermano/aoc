@@ -737,9 +737,6 @@ pushes all boxes that can be pushed if any"
                      (seq-positions flatmap ?O))))
 #+end_src
 
-#+RESULTS: move-push-and-gps
-: 2028
-
 #+call: move-push-and-gps(input=example-15a)
 
 #+RESULTS:
@@ -1282,38 +1279,340 @@ Register C: 0
 Program: 0,1,5,4,3,0
 #+end_example
 
+#+name: program-output
 #+begin_src elisp :var input=example-17a
 (defun combo-op (op reg-a reg-b reg-c)
   "returns the combo operator value of op"
-  (pcase (string-to-number op)
-    ((pred (< 4)) op)
-    ((pred (= 4)) reg-a)
-    ((pred (= 5)) reg-b)
-    ((pred (= 6)) reg-c)
-    (_ nil)))
+  (aref (vector 0 1 2 3 reg-a reg-b reg-c t) op))
 
 (let* ((parsed (mapcar (lambda (s) (s-split "," (car (reverse (s-split " " s))))) (s-lines (s-replace "\n\n" "\n" (s-trim input)))))
        (reg-a (string-to-number (caar parsed)))
        (reg-b (string-to-number (caadr parsed)))
        (reg-c (string-to-number (caaddr parsed)))
-       (program (vconcat (mapcar 'vconcat (seq-split (cadddr parsed) 2))))
+       (program (vconcat (mapcar 'vconcat (seq-split (mapcar 'string-to-number (cadddr parsed)) 2))))
+       (outputs)
        (ic 0))
-  (while (< ic (length program))
-    (pcase (aref (aref program ic) 0)
-      ("0"
-       (message "adv (ash A << op)")
-       (setq reg-a (ash reg-a (combo-op (aref (aref program ic) 1) reg-a reg-b reg-c))))
-      ("1" (message "bxl"))
-      ("2" (message "bst"))
-      ("3" (message "jnz"))
-      ("4" (message "bxc"))
-      ("5" (message "out"))
-      ("6" (message "bdv"))
-      ("7" (message "cdv")))
-    (setq ic (1+ ic))
+  (while-let ((_ (< ic (length program)))
+              (inst (aref program ic))
+              (code (aref inst 0))
+              (op (aref inst 1))
+              (c-op (combo-op op reg-a reg-b reg-c))
+              (inc 1))
+
+    (message "%d %d %d" reg-a reg-b reg-c)
+    (message "%d %d %s" code op c-op)
+    (pcase code
+      (0 (message "adv")
+         (setq reg-a (ash reg-a (* -1 c-op))))
+      (1 (message "bxl")
+         (setq reg-b (logxor reg-b op)))
+      (2 (message "bst")
+         (setq reg-b (logand c-op 7)))
+      (3 (message "jnz")
+         (unless (zerop reg-a)
+           (setq inc 0)
+           (setq ic op)))
+      (4 (message "bxc")
+         (setq reg-b (logxor reg-b reg-c)))
+      (5 (message "out")
+         (push (logand c-op 7) outputs))
+      (6 (message "bdv")
+         (setq reg-b (ash reg-a (* -1 c-op))))
+      (7 (message "cdv")
+         (setq reg-c (ash reg-a (* -1 c-op)))))
+    (message "%d %d" ic inc)
+    (setq ic (+ ic inc))
     )
-  (message "%d %d %d %s" reg-a reg-b reg-c program))
+  (message "%d %d %d %s" reg-a reg-b reg-c program)
+  (s-join "," (mapcar 'number-to-string (reverse outputs))))
+#+end_src
+
+#+RESULTS: program-output
+: 4,6,3,5,6,3,5,2,1,0
+
+#+call: program-output(input=input-file("input-17.txt"))
+
+#+RESULTS:
+: 2,3,4,7,5,7,3,0,7
+
+#+name: example-17b
+#+begin_example
+Register A: 2024
+Register B: 0
+Register C: 0
+
+Program: 0,3,5,4,3,0
+#+end_example
+
+This is really hard. we can probably reverse engineer from the reverse program output
+but requires a lot of memory and trial and error and building the tables for which
+the output is the expected after the iteration.
+
+we also need to remember all possible candidates as it could be that a future one doesnt give us the desired
+output so we need to backtrack.
+
+
+#+begin_src elisp :var input=example-17b
+(defun combo-op (op reg-a reg-b reg-c)
+  "returns the combo operator value of op"
+  (aref (vector 0 1 2 3 reg-a reg-b reg-c 8) op))
+
+(defun min-as-match-output (program as output)
+  "retun minimum of as that produce expected output when run in program
+assumes as are ordered"
+  (let ((ic 0)
+        (ra (vconcat as))
+        (rb (make-vector (length as) 0))
+        (rc (make-vector (length as) 0))
+        (min-ras)
+        (outputs (make-vector (length as) 8))) ;; 8 is just to fill with an invalid number
+    (dotimes (i (length ra))
+      (setq ic 0)
+      (while-let ((_ (< ic (length program)))
+                  (inst (aref program ic))
+                  (code (aref inst 0))
+                  (op (aref inst 1))
+                  (c-op (combo-op op (aref ra i) (aref rb i) (aref rc i)))
+                  (inc 1))
+        (pcase code
+          (0
+           (aset ra i (ash (aref ra i) (* -1 c-op))))
+          (1
+           (aset rb i (logxor (aref rb i) op)))
+          (2
+           (aset rb i (logand c-op 7) op))
+          (3
+           ;; do nothing, we want one single iteration
+           (when (= (aref outputs i) output)
+             (push (aref ra i) min-ras)))
+          (4
+           (aset rb i (logand (aref rb i) (aref rc i))))
+          (5
+           (aset outputs i (logand c-op 7)))
+          (6
+           (aset rb i (ash (aref ra i) (* -1 c-op))))
+          (7
+           (aset rc i (ash (aref ra i) (* -1 c-op)))))
+        (message "\t\ti:%d ra:%d rb:%d rc:%d" i (aref ra i) (aref rb i) (aref rc i))
+        (setq ic (+ ic inc))))
+
+    min-ras))
+
+
+(let* ((parsed (mapcar (lambda (s) (s-split "," (car (reverse (s-split " " s))))) (s-lines (s-replace "\n\n" "\n" (s-trim input)))))
+       (raw-program (mapcar 'string-to-number (cadddr parsed)))
+       (program (vconcat (mapcar 'vconcat (seq-split raw-program 2))))
+       (as '(1 2 3 4 5 6 7))
+       (a))
+  (setq raw-program (reverse raw-program))
+  (message "%s" raw-program)
+  (while-let ((output (pop raw-program)))
+    (while-let (()))
+    (let ((min-as (min-as-match-output program as output)))
+      (message "%s" min-as)
+      (mapc (lambda (ma) (push (+ (ash ma 3) a))) min-as)
+
+      (setq as (mapcar (lambda (i) (+ (ash min-a 3) i)) '(0 1 2 3 4 5 6 7)))))
+  a)
+#+end_src
+
+
+* Day 18
+
+#+name: example-18a
+#+begin_example
+5,4
+4,2
+4,5
+3,0
+2,1
+6,3
+2,4
+1,5
+0,6
+3,3
+2,6
+5,1
+1,2
+5,5
+2,5
+6,5
+1,4
+0,4
+6,4
+1,1
+6,1
+1,0
+0,5
+1,6
+2,0
+#+end_example
+
+#+name: shortest-path-count
+#+begin_src elisp :var input=example-18a :var n=7 :var bytes=12
+(defun print-map (map n)
+  "prints the map as matrix"
+  (mapconcat 'identity (mapcar 'concat (seq-split map n)) "\n"))
+
+(defun neighbors (pos map visited n)
+  "get list of valid (non-wall) neighbors"
+  (let ((neighs))
+    (mapc (lambda (move) (when-let ((y (+ (/ pos n) (car move)))
+                                    (x (+ (% pos n) (cdr move)))
+                                    (node (+ (* y n) x))
+                                    (_ (and (< -1 x n)
+                                            (< -1 y n)
+                                            (not (= (aref map node) ?#))
+                                            (not (aref visited node)))))
+                           (push node neighs)))
+          '((-1 . 0) (1 . 0) (0 . -1) (0 . 1)))
+    neighs))
+
+(let* ((parsed (vconcat (mapcar (lambda (l) (vconcat (reverse (mapcar 'string-to-number
+                                                                      (s-split "," l)))))
+                                (s-lines (s-trim input)))))
+       (flatmap (make-vector (* n n) ?.))
+       (source 0)
+       (sink (1- (length flatmap)))
+       (visited (make-vector (* n n) nil))
+       (costs (make-vector (* n n) nil))
+       (previous (make-vector (* n n) nil))
+       (pqueue))
+  (dotimes (b bytes)
+    (aset flatmap
+          (+ (* (aref (aref parsed b) 0) n)
+             (aref (aref parsed b) 1))
+          ?#))
+  (aset costs source 0)
+  (push source pqueue)
+
+  (while-let ((node (pop pqueue))
+              (_ (not (= node sink))))
+    (aset visited node t)
+    (mapc (lambda (neigh)
+            (when-let ((cost (+ (aref costs node) 1))
+                       (_ (<= cost (or (aref costs neigh)
+                                       most-positive-fixnum))))
+              (aset previous neigh node)
+              (aset costs neigh cost)
+              (unless (memq neigh pqueue)
+                (push neigh pqueue))))
+          (neighbors node flatmap visited n))
+
+    (cl-sort pqueue (lambda (u v) (< (or (aref costs u)
+                                        most-positive-fixnum)
+                                     (or (aref costs v)
+                                         most-positive-fixnum)))))
+  (let ((pos sink)
+        (path))
+
+    (aset flatmap source ?S)
+    (while-let ((prev (aref previous pos))
+                (_ (not (= pos source))))
+      (aset flatmap pos ?O)
+      (push pos path)
+      (setq pos prev))
+
+    (aset flatmap sink ?s)
+    (message "%s" (print-map flatmap n))
+    (length path)))
 #+end_src
 
 #+RESULTS:
-: 729 0 0 [[0 1] [5 4] [3 0]]
+: 22
+
+#+call: shortest-path-count(input=input-file("input-18.txt"),n=71,bytes=1024)
+
+#+RESULTS:
+: 364
+
+#+name: shortest-path-cutoff
+#+begin_src elisp :var input=example-18a :var n=7 :var min-bytes=12
+(defun print-map (map n)
+  "prints the map as matrix"
+  (mapconcat 'identity (mapcar 'concat (seq-split map n)) "\n"))
+
+(defun neighbors (pos map visited n)
+  "get list of valid (non-wall) neighbors"
+  (let ((neighs))
+    (mapc (lambda (move) (when-let ((y (+ (/ pos n) (car move)))
+                                    (x (+ (% pos n) (cdr move)))
+                                    (node (+ (* y n) x))
+                                    (_ (and (< -1 x n)
+                                            (< -1 y n)
+                                            (not (= (aref map node) ?#))
+                                            (not (aref visited node)))))
+                           (push node neighs)))
+          '((-1 . 0) (1 . 0) (0 . -1) (0 . 1)))
+    neighs))
+
+(defun dijkstra-reachable-p (map source sink n)
+  "return non-nill if dijkstra on map from source to sink reaches"
+  (let* ((visited (make-vector (* n n) nil))
+         (costs (make-vector (* n n) nil))
+         (previous (make-vector (* n n) nil))
+         (pqueue))
+    (aset costs source 0)
+    (push source pqueue)
+
+    (while-let ((node (pop pqueue))
+                (_ (not (= node sink))))
+      (aset visited node t)
+      (mapc (lambda (neigh)
+              (when-let ((cost (+ (aref costs node) 1))
+                         (_ (<= cost (or (aref costs neigh)
+                                         most-positive-fixnum))))
+                (aset previous neigh node)
+                (aset costs neigh cost)
+                (unless (memq neigh pqueue)
+                  (push neigh pqueue))))
+            (neighbors node flatmap visited n))
+
+      (cl-sort pqueue (lambda (u v) (< (or (aref costs u)
+                                           most-positive-fixnum)
+                                       (or (aref costs v)
+                                           most-positive-fixnum)))))
+    (let ((pos sink)
+          (path))
+
+      (while-let ((prev (aref previous pos))
+                  (_ (not (= pos source))))
+        (push pos path)
+        (setq pos prev))
+      ;; (message "%s" path))
+      )
+    (aref previous sink)))
+
+
+(let* ((parsed (vconcat (mapcar (lambda (l) (vconcat (reverse (mapcar 'string-to-number
+                                                                      (s-split "," l)))))
+                                (s-lines (s-trim input)))))
+       (flatmap (make-vector (* n n) ?.))
+       (source 0)
+       (sink (1- (length flatmap)))
+       (bytes min-bytes)
+       (done nil))
+  (dotimes (b bytes)
+    (aset flatmap
+          (+ (* (aref (aref parsed b) 0) n)
+             (aref (aref parsed b) 1))
+          ?#))
+
+  (while (and (dijkstra-reachable-p flatmap source sink n)
+              (< bytes (length parsed)))
+    (setq bytes (1+ bytes))
+    (when (< bytes (length parsed))
+      (aset flatmap
+            (+ (* (aref (aref parsed bytes) 0) n)
+               (aref (aref parsed bytes) 1))
+            ?#)))
+  (if-let ((_ (< bytes (length parsed)))
+           (byte (aref parsed bytes)))
+      (format "%d,%d" (aref byte 1) (aref byte 0))
+    nil))
+  #+end_src
+
+  #+RESULTS: shortest-path-cutoff
+  : 6,1
+
+  #+call: shortest-path-cutoff(input=input-file("input-18.txt"),n=71,min-bytes=1024)
